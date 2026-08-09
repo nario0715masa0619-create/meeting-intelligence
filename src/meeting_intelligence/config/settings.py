@@ -13,6 +13,15 @@ class Settings(BaseSettings):
     analysis_provider: str = "openai"
     transcription_model: str = ""
     analysis_model: str = ""
+    ffmpeg_path: str = "ffmpeg"
+    ffprobe_path: str = "ffprobe"
+    audio_codec: str = "libmp3lame"
+    audio_bitrate: str = "64k"
+    audio_sample_rate: int = 16000
+    audio_channels: int = 1
+    max_audio_bytes: int = 20 * 1024 * 1024
+    max_chunk_duration_seconds: float = 1800.0
+    subprocess_timeout_seconds: float = 300.0
     openai_api_key: SecretStr | None = Field(
         default=None,
         validation_alias=AliasChoices("OPENAI_API_KEY", "MI_OPENAI_API_KEY"),

@@ -20,7 +20,7 @@ Human-readable Output
 
 ## Implementation status
 
-Implementation Phase 1 provides the Python project foundation, canonical Pydantic models, schema validation, Provider interfaces, configuration foundation, CLI skeleton, and unit tests. It does not process recordings or call OpenAI or ffmpeg.
+Implementation Phase 2 adds safe MP4 validation, ffprobe metadata inspection, reproducible MP3 extraction, configurable time/size-based chunking, hashing, overwrite protection, and workspace cleanup. It does not transcribe or analyze meetings and makes no OpenAI API calls.
 
 The final MVP UX goal is:
 
@@ -51,6 +51,12 @@ Run the unit tests with:
 ```powershell
 .\.venv\Scripts\python -m pytest
 ```
+
+## Media prerequisite
+
+Install the system `ffmpeg` distribution so both `ffmpeg` and `ffprobe` are on PATH. Their executable paths can be overridden through `MI_FFMPEG_PATH` and `MI_FFPROBE_PATH`.
+
+Phase 2 prepares mono 16 kHz MP3 audio at 64 kbit/s. Thresholds, encoding settings, executable paths, and subprocess timeout are configurable. Existing artifacts are never silently overwritten, and source MP4 files are preserved.
 
 The planned local outputs are:
 
