@@ -61,4 +61,3 @@ def test_json_roundtrip_dates_enums_japanese_and_schema() -> None:
     assert "会議.mp4" in encoded and "2026-08-15" in encoded
     assert MeetingRecord.model_validate_json(encoded) == original
     assert MeetingRecord.model_json_schema()["type"] == "object"
-

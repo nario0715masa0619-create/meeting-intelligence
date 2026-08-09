@@ -26,4 +26,3 @@ class TranscriptRecord(BaseModel):
     language: str
     duration_seconds: float = Field(ge=0)
     segments: list[TranscriptSegment] = Field(default_factory=list)
-

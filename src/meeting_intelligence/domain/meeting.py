@@ -146,4 +146,3 @@ class MeetingRecord(CanonicalModel):
     open_items: list[OpenItem] = Field(default_factory=list)
     processing: ProcessingMetadata
     quality: Quality
-

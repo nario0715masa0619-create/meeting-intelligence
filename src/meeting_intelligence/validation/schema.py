@@ -17,4 +17,3 @@ def validate_meeting(data: dict[str, Any] | str | bytes) -> MeetingRecord:
         return MeetingRecord.model_validate(data) if isinstance(data, dict) else MeetingRecord.model_validate_json(data)
     except ValidationError as exc:
         raise SchemaValidationError("invalid Canonical Meeting Record") from exc
-

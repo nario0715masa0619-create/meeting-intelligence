@@ -33,4 +33,3 @@ def test_japanese_json_roundtrip_and_schema_generation() -> None:
     assert "こんにちは" in encoded
     assert TranscriptRecord.model_validate_json(encoded) == original
     assert TranscriptRecord.model_json_schema()["type"] == "object"
-

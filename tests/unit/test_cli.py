@@ -8,4 +8,3 @@ def test_cli_options(argument: str, expected: str, capsys: pytest.CaptureFixture
         main([argument])
     assert exc.value.code == 0
     assert expected in capsys.readouterr().out
-

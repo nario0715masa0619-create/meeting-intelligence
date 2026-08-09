@@ -8,4 +8,3 @@ class SchemaValidationError(MeetingIntelligenceError):
 
 class ConfigurationError(MeetingIntelligenceError):
     """Application configuration is invalid."""
-

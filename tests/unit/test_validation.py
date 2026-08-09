@@ -8,4 +8,3 @@ def test_validation_errors_are_translated() -> None:
         validate_transcript({"schema_version": "0.1.0"})
     with pytest.raises(SchemaValidationError):
         validate_meeting("{}")
-

@@ -18,4 +18,3 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("OPENAI_API_KEY", "MI_OPENAI_API_KEY"),
         repr=False,
     )
-
