@@ -18,14 +18,38 @@ Human-readable Output
 
 `meeting.json` is the Canonical Meeting Record and source of truth. Markdown files are human-readable projections, not canonical data.
 
-## Design v0.1 status
+## Implementation status
 
-This repository currently contains design documentation only. Application code, package setup, schemas, tests, provider connections, and runtime infrastructure are intentionally not implemented in this phase.
+Implementation Phase 1 provides the Python project foundation, canonical Pydantic models, schema validation, Provider interfaces, configuration foundation, CLI skeleton, and unit tests. It does not process recordings or call OpenAI or ffmpeg.
 
 The final MVP UX goal is:
 
 ```text
 meeting-process <video-file>
+```
+
+In Phase 1, only help and version behavior are implemented:
+
+```powershell
+meeting-process --help
+meeting-process --version
+```
+
+Running the command without an option reports that the processing pipeline is not yet implemented.
+
+## Development setup
+
+Python 3.11 or newer is required. Use a repository-local virtual environment:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -e ".[dev]"
+```
+
+Run the unit tests with:
+
+```powershell
+.\.venv\Scripts\python -m pytest
 ```
 
 The planned local outputs are:
