@@ -145,4 +145,3 @@ meeting-intelligence/
 - Meeting Intelligence remains independent of the Luvira OS runtime.
 - A Meeting Intelligence Decision is not a Luvira OS Approved Decision.
 - An Action Item is not a Luvira OS Managed Task.
-

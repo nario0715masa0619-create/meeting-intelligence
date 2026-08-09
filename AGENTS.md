@@ -26,4 +26,3 @@ Follow the approved and documented Meeting Intelligence design. During the curre
 - Keep Provider limits and model names in configuration and runtime metadata, not fixed as Core Domain rules or schema constants.
 - Treat the Canonical Meeting Record as a historical, immutable record of processing time.
 - Do not silently treat partial pipeline failure as successful completion.
-

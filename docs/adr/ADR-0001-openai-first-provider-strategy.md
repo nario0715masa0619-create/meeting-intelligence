@@ -49,4 +49,3 @@ Supporting multiple Providers could improve portability, but it would expand con
 ### Direct OpenAI dependency without Provider abstraction
 
 Calling the OpenAI SDK directly from Core Domain or application rules would be simpler initially, but it would violate the dependency rule, entangle canonical models with vendor payloads, and make future replacement or testing harder. This alternative is rejected.
-

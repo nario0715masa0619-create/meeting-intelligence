@@ -107,4 +107,3 @@ Infinite retry is prohibited. Retry decisions must be stage-aware, bounded, and 
 ## Output finalization
 
 On successful completion, write all required collections even when empty and use `null` for unknown scalar or object values. Validate canonical JSON before generating Markdown projections. Temporary audio must be cleanable, while the original source recording remains untouched and un-copied.
-

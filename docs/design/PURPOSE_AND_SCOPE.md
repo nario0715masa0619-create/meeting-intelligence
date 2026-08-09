@@ -137,4 +137,3 @@ Luvira OS Managed Task
 ```
 
 Meeting Intelligence does not own the Managed Task lifecycle.
-

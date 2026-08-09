@@ -247,4 +247,3 @@ The `quality` object conceptually contains:
 ```
 
 Allowed status values are `pass`, `pass_with_warnings`, and `failed`. Each warning carries a machine-readable code.
-

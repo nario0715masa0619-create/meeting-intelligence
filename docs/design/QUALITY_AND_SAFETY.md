@@ -90,4 +90,3 @@ An Action Item is not a Luvira OS Managed Task. It may become a Task Candidate f
 - Keep Provider limits configurable rather than embedding them as Domain rules.
 - Do not silently discard low-confidence extracted items.
 - Do not introduce cloud storage, a database, a Web UI, or additional Providers without an approved scope change.
-

@@ -54,4 +54,3 @@ The original MP4 is not copied into the output directory. Its source path and SH
 ## Current boundary
 
 Meeting Intelligence is independent of Luvira OS. It is designed so that it may later become a Luvira OS capability, but it has no Luvira OS runtime dependency. A confirmed meeting `Decision` is only a future decision candidate, not a Luvira OS `Approved Decision`. Likewise, an `Action Item` is only a future task candidate, not a Luvira OS `Managed Task`.
-
