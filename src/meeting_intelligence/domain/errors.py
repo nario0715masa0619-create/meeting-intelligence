@@ -43,3 +43,37 @@ class MediaProcessError(MediaError):
         self.operation = operation
         self.return_code = return_code
         self.stderr_summary = summary
+
+
+class TranscriptionError(MeetingIntelligenceError):
+    """Base transcription failure with an explicit retry classification."""
+
+    retryable = False
+
+
+class TranscriptionAuthenticationError(TranscriptionError):
+    """Authentication failed without exposing credentials."""
+
+
+class TranscriptionRateLimitError(TranscriptionError):
+    """The Provider rejected the request due to rate limiting."""
+
+    retryable = True
+
+
+class TranscriptionTimeoutError(TranscriptionError):
+    """The Provider request timed out."""
+
+    retryable = True
+
+
+class TranscriptionProviderError(TranscriptionError):
+    """The Provider failed for a reason not represented more specifically."""
+
+    def __init__(self, message: str, *, retryable: bool = False) -> None:
+        super().__init__(message)
+        self.retryable = retryable
+
+
+class TranscriptionResponseError(TranscriptionError):
+    """The Provider returned a malformed or contradictory response."""

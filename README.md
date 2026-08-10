@@ -20,7 +20,7 @@ Human-readable Output
 
 ## Implementation status
 
-Implementation Phase 2 adds safe MP4 validation, ffprobe metadata inspection, reproducible MP3 extraction, configurable time/size-based chunking, hashing, overwrite protection, and workspace cleanup. It does not transcribe or analyze meetings and makes no OpenAI API calls.
+Implementation Phase 3 adds an OpenAI Transcriptions API Adapter that converts Prepared Audio into a Canonical Transcript Record. Meeting analysis and full end-to-end CLI processing remain unimplemented.
 
 The final MVP UX goal is:
 
@@ -57,6 +57,27 @@ Run the unit tests with:
 Install the system `ffmpeg` distribution so both `ffmpeg` and `ffprobe` are on PATH. Their executable paths can be overridden through `MI_FFMPEG_PATH` and `MI_FFPROBE_PATH`.
 
 Phase 2 prepares mono 16 kHz MP3 audio at 64 kbit/s. Thresholds, encoding settings, executable paths, and subprocess timeout are configurable. Existing artifacts are never silently overwritten, and source MP4 files are preserved.
+
+## OpenAI transcription
+
+Set `OPENAI_API_KEY` in the ignored local Repository-root `.env` file. Never commit its value. The default model is `gpt-4o-transcribe-diarize` with `diarized_json`, Japanese language configuration, and automatic server chunking.
+
+For one audio artifact, Provider speaker labels are preserved. For multiple Media chunks, labels are scoped such as `chunk_0001:A` because speaker identity is not assumed to remain stable across independent API calls. Normal tests use an injected fake client and never call a paid API. Live API acceptance is opt-in and is not run by the regular test suite.
+
+To run the live OpenAI transcription acceptance test, put the following local-only values in the ignored Repository-root `.env` file. The audio must be a short Japanese WAV file outside the Repository:
+
+```text
+OPENAI_API_KEY=<set-locally>
+MEETING_INTELLIGENCE_LIVE_AUDIO=C:\path\to\short-japanese-speech.wav
+```
+
+Then explicitly select the `live` marker:
+
+```powershell
+.\.venv\Scripts\python -m pytest -m live -v -p no:cacheprovider
+```
+
+The test skips when either `.env` setting is absent. A regular `python -m pytest` run always skips tests marked `live`, even when both values are configured.
 
 The planned local outputs are:
 

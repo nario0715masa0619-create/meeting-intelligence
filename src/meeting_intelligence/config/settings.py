@@ -11,7 +11,9 @@ class Settings(BaseSettings):
     work_dir: Path = Path(".work")
     transcription_provider: str = "openai"
     analysis_provider: str = "openai"
-    transcription_model: str = ""
+    transcription_model: str = "gpt-4o-transcribe-diarize"
+    transcription_response_format: str = "diarized_json"
+    transcription_language: str = "ja"
     analysis_model: str = ""
     ffmpeg_path: str = "ffmpeg"
     ffprobe_path: str = "ffprobe"
@@ -27,3 +29,10 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("OPENAI_API_KEY", "MI_OPENAI_API_KEY"),
         repr=False,
     )
+    live_audio_path: Path | None = Field(
+        default=None,
+        validation_alias="MEETING_INTELLIGENCE_LIVE_AUDIO",
+    )
+    openai_timeout_seconds: float = 300.0
+    openai_max_retries: int = 2
+    openai_max_upload_bytes: int = 20 * 1024 * 1024
