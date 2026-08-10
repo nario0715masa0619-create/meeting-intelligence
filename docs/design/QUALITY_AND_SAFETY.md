@@ -21,7 +21,17 @@ Before a Canonical Meeting Record is considered complete, validation must confir
 
 ## Evidence preservation
 
-The canonical trace is:
+The formal Evidence hierarchy is:
+
+```text
+Original MP4
+        ↓
+transcript.json (Canonical Primary Derived Evidence)
+        ↓
+meeting.json (AI interpretation)
+```
+
+Human-readable `transcript.md` and `meeting.md` files are projections, not independent Evidence sources. The canonical trace for extracted items is:
 
 ```text
 Decision / Action Item / Open Item
@@ -34,6 +44,8 @@ Original MP4
 ```
 
 Transcript normalization may reconcile chunks, timestamps, whitespace, and clear duplicates. It must not alter, supplement, or beautify speech in a way that changes Evidence.
+
+After successful output finalization, `transcript.json` and its `transcript.md` projection are immutable for that processing run. Downstream analysis must not rewrite them to correct text, infer speaker identity, change timestamps, or align the transcript with an interpretation. Reprocessing must fail rather than silently overwrite an existing meeting output until explicit run versioning is designed.
 
 ## Confidence and human review
 
@@ -76,6 +88,8 @@ Failures contain `error_code`, `stage`, `message`, and `retryable`. Retry is bou
 ## Historical record principle
 
 `meeting.json` is a historical, immutable record of the meeting-processing result at processing time. Future downstream changes must not rewrite it. Application, schema, prompt, Provider, and model metadata make the result reproducible and traceable.
+
+`transcript.json` is likewise an immutable historical primary derived record. It is validated before persistence, finalized with `transcript.md` and completed `metadata.json` as one required artifact set, and protected against silent overwrite. Artifact hashes support later modification detection. A partial write must not be reported as completed.
 
 ## Luvira OS governance boundary
 

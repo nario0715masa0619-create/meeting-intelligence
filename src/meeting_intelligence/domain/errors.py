@@ -77,3 +77,19 @@ class TranscriptionProviderError(TranscriptionError):
 
 class TranscriptionResponseError(TranscriptionError):
     """The Provider returned a malformed or contradictory response."""
+
+
+class OutputError(MeetingIntelligenceError):
+    """Base failure while validating or persisting output artifacts."""
+
+
+class OutputValidationError(OutputError):
+    """A record cannot be persisted as canonical output."""
+
+
+class OutputExistsError(OutputError):
+    """An immutable meeting output already exists."""
+
+
+class OutputWriteError(OutputError):
+    """The required artifact set could not be finalized."""

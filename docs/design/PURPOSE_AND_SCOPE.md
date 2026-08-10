@@ -16,7 +16,7 @@ Canonical Structured Meeting Record
 Human-readable Output
 ```
 
-The Canonical Meeting Record is `meeting.json`. Markdown is a human-readable projection and is not the source of truth.
+The Canonical Primary Derived Evidence is `transcript.json`. The later Canonical Meeting Record is `meeting.json`, which structures analysis without replacing or rewriting the primary transcript. Markdown is a human-readable projection and is not a source of truth.
 
 ## MVP input and operation
 
@@ -41,9 +41,9 @@ output/<meeting-id>/
 └─ metadata.json
 ```
 
-- `meeting.json`: Canonical Meeting Record
+- `meeting.json`: Canonical Meeting Record containing structured interpretation
 - `meeting.md`: human-readable meeting record
-- `transcript.json`: Canonical Transcript Record
+- `transcript.json`: Canonical Transcript Record and Primary Derived Evidence
 - `transcript.md`: human-readable transcript
 - `metadata.json`: processing metadata
 

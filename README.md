@@ -16,11 +16,11 @@ Canonical Structured Meeting Record
 Human-readable Output
 ```
 
-`meeting.json` is the Canonical Meeting Record and source of truth. Markdown files are human-readable projections, not canonical data.
+`transcript.json` is the Canonical Primary Derived Evidence. The future `meeting.json` is the Canonical Meeting Record for structured analysis, not a replacement for or correction of the primary transcript. Markdown files are human-readable projections, not canonical data.
 
 ## Implementation status
 
-Implementation Phase 3 adds an OpenAI Transcriptions API Adapter that converts Prepared Audio into a Canonical Transcript Record. Meeting analysis and full end-to-end CLI processing remain unimplemented.
+Implementation Phase 4 persists a validated Canonical Transcript Record as immutable primary derived Evidence. Meeting analysis and full end-to-end CLI processing remain unimplemented.
 
 The final MVP UX goal is:
 
@@ -79,18 +79,30 @@ Then explicitly select the `live` marker:
 
 The test skips when either `.env` setting is absent. A regular `python -m pytest` run always skips tests marked `live`, even when both values are configured.
 
-The planned local outputs are:
+Phase 4 creates the following local outputs for one meeting:
 
 ```text
 output/<meeting-id>/
-├─ meeting.json
-├─ meeting.md
 ├─ transcript.json
 ├─ transcript.md
 └─ metadata.json
 ```
 
-The original MP4 is not copied into the output directory. Its source path and SHA-256 hash are retained as metadata.
+- `transcript.json` is the Canonical Primary Derived Evidence and source for downstream analysis.
+- `transcript.md` is a human-readable projection that does not correct or supplement the canonical transcript.
+- `metadata.json` records completed processing context, source traceability, and artifact hashes.
+
+The output directory must not already exist. Phase 4 never silently overwrites or edits a completed transcript record. All three files are prepared in a temporary sibling directory and the meeting directory is finalized only after the complete artifact set is ready. The original MP4 is not copied or modified; its absolute source path and SHA-256 hash are retained in metadata.
+
+```text
+Original MP4
+  → transcript.json (Canonical Primary Derived Evidence)
+  → transcript.md (human-readable projection)
+  → future meeting.json (AI interpretation)
+  → future meeting.md (human-readable projection)
+```
+
+Downstream meeting analysis must read but never rewrite `transcript.json` or `transcript.md`.
 
 ## Documentation
 

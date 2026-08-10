@@ -19,6 +19,8 @@ TranscriptionProvider
         ↓
 Transcript
         ↓
+Validated immutable transcript.json
+        ↓
 AnalysisProvider
         ↓
 Structured Analysis
@@ -140,6 +142,7 @@ meeting-intelligence/
 ## Architectural boundaries
 
 - `meeting.json` is a historical Canonical Meeting Record and is not rewritten to reflect later downstream task or governance state.
+- `transcript.json` is immutable Canonical Primary Derived Evidence; analysis reads it but never rewrites it.
 - Markdown is derived from canonical JSON, never the reverse.
 - The original recording stays at its source path and is not copied to the output directory.
 - Meeting Intelligence remains independent of the Luvira OS runtime.

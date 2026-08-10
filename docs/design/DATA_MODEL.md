@@ -2,7 +2,17 @@
 
 ## Canonical data philosophy
 
-`meeting.json` is the Canonical Meeting Record. `transcript.json` is the Canonical Transcript Record. `meeting.md` and `transcript.md` are human-readable projections and must not be treated as sources of truth.
+`transcript.json` is the Canonical Transcript Record and Canonical Primary Derived Evidence. `meeting.json` is the later Canonical Meeting Record and represents AI interpretation of that primary transcript. `meeting.md` and `transcript.md` are human-readable projections and must not be treated as sources of truth.
+
+```text
+Original MP4 = Original Evidence
+transcript.json = Canonical Primary Derived Evidence
+transcript.md = human-readable projection of transcript.json
+meeting.json = AI interpretation / structured meeting analysis
+meeting.md = human-readable projection of meeting.json
+```
+
+`meeting.json` is not a higher-order source of Evidence than `transcript.json`. Downstream analysis may reference the primary transcript but must not rewrite it.
 
 The Canonical Meeting Record schema version for Design v0.1 is `0.1.0`.
 
@@ -35,6 +45,8 @@ Transcript
 ```
 
 Transcript Segment IDs are stable canonical Evidence references within the meeting output.
+
+Once a processing run finalizes `transcript.json`, that file is an immutable historical record of the transcription received and normalized at that time. Later stages must not correct its grammar, infer speaker names, alter timestamps, or replace its text. `transcript.md` preserves the same text, timestamps, null speaker meaning, and chunk-scoped speaker labels as a one-way projection.
 
 ## Canonical Meeting Record
 
@@ -233,6 +245,8 @@ Processing metadata records at least:
 - `analysis.model`
 
 Provider and model values are the actual runtime values. Model names are not fixed into the schema.
+
+For primary transcript persistence, `metadata.json` additionally records completed status; original source path, name, size, duration, and SHA-256; transcription response format and language; and paths plus SHA-256 hashes for `transcript.json` and `transcript.md`. `prompt_version` is `null` when transcription used no prompt version.
 
 ## Quality
 

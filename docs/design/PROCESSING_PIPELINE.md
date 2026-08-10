@@ -13,12 +13,14 @@ One MP4 file is processed as one meeting after recording has ended.
 | 4 | Audio Preparation | Compress or chunk audio when required by configured Provider constraints. |
 | 5 | Transcription | Submit prepared audio through `TranscriptionProvider`. |
 | 6 | Transcript Normalization | Merge chunks and normalize segments without changing Evidence meaning. |
-| 7 | Meeting Analysis | Analyze the Canonical Transcript Record through `AnalysisProvider`. |
-| 8 | Structured Extraction | Produce summaries, Topics, Decisions, Action Items, and Open Items. |
-| 9 | Validation | Validate schema, invariants, Evidence references, quality, and unknown-value handling. |
-| 10 | Canonical Record Generation | Write the completed `meeting.json` and associated canonical records. |
-| 11 | Markdown Projection | Derive `meeting.md` and `transcript.md` from canonical data. |
-| 12 | Finalize / Cleanup | Finalize metadata and safely clean temporary audio and workspace artifacts. |
+| 7 | Transcript Validation | Validate the Canonical Transcript Record before persistence. |
+| 8 | Primary Transcript Persistence | Atomically finalize immutable `transcript.json`, its `transcript.md` projection, and completed `metadata.json`. |
+| 9 | Meeting Analysis | Analyze the persisted Canonical Transcript Record through `AnalysisProvider`. |
+| 10 | Structured Extraction | Produce summaries, Topics, Decisions, Action Items, and Open Items. |
+| 11 | Meeting Validation | Validate schema, invariants, Evidence references, quality, and unknown-value handling. |
+| 12 | Canonical Meeting Generation | Write the completed `meeting.json`. |
+| 13 | Meeting Markdown Projection | Derive `meeting.md` from canonical data. |
+| 14 | Finalize / Cleanup | Finalize processing and safely clean temporary audio and workspace artifacts. |
 
 Stage completion must be explicit. A later-stage failure must not retroactively label the overall run as completed.
 
@@ -57,6 +59,12 @@ Normalization must not:
 
 The transcript is Evidence, not editable narrative prose.
 
+## Primary transcript persistence
+
+After normalization, `transcript.json` is validated and persisted as the Canonical Primary Derived Evidence. `transcript.md` is derived only from that record, and `metadata.json` links both artifacts to the original MP4 and the actual runtime Provider configuration. A completed primary transcript record is immutable: downstream analysis, summarization, grammar correction, speaker naming, and reprocessing must not rewrite it.
+
+For the MVP, `output/<meeting-id>/` must not already exist. The complete three-file artifact set is written to a temporary sibling directory and finalized by an atomic directory rename. A write failure must not create a completed meeting directory or completed metadata. Reprocessing run versioning is deferred.
+
 ## Processing states
 
 The processing lifecycle uses these conceptual states:
@@ -68,6 +76,7 @@ extracting_audio
 transcribing
 analyzing
 validating_output
+writing_output
 completed
 failed
 ```
@@ -106,4 +115,4 @@ Infinite retry is prohibited. Retry decisions must be stage-aware, bounded, and 
 
 ## Output finalization
 
-On successful completion, write all required collections even when empty and use `null` for unknown scalar or object values. Validate canonical JSON before generating Markdown projections. Temporary audio must be cleanable, while the original source recording remains untouched and un-copied.
+On successful transcript persistence, `transcript.json`, `transcript.md`, and `metadata.json` must all exist before the primary output is reported as completed. Write all required collections even when empty and use `null` for unknown scalar or object values. Validate canonical JSON before generating Markdown projections. Temporary audio must be cleanable, while the original source recording remains untouched and un-copied.

@@ -13,7 +13,7 @@ Follow the approved and documented Meeting Intelligence design. During the curre
 5. Core Domain code must not depend directly on the OpenAI SDK.
 6. AI-extracted facts must not invent missing information; represent unknown values as `null`.
 7. Preserve Evidence traceability from extracted items to Transcript Segments, timestamps, and the original recording.
-8. `meeting.json` is canonical; Markdown is a human-readable projection.
+8. `transcript.json` is Canonical Primary Derived Evidence; `meeting.json` is the canonical analysis record; Markdown files are human-readable projections.
 9. Meeting Intelligence Decisions are not automatically Luvira OS Approved Decisions.
 10. Meeting Intelligence Action Items are not automatically Luvira OS Managed Tasks.
 11. Prefer a simple MVP implementation over speculative abstractions.

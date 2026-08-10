@@ -22,4 +22,4 @@ Start with purpose and scope, then architecture and pipeline. Read the data mode
 
 ## Source-of-truth hierarchy
 
-The approved design documentation governs implementation. At runtime, `meeting.json` is the Canonical Meeting Record; `transcript.json` is the Canonical Transcript Record. Markdown output is a human-readable projection and must not become the source of truth.
+The approved design documentation governs implementation. At runtime, `transcript.json` is the Canonical Primary Derived Evidence; `meeting.json` is the later Canonical Meeting Record for structured analysis. Markdown output is a human-readable projection and must not become a source of truth.
