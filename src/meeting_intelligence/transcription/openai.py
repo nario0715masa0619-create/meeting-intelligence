@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
+import re
+from threading import Event, Thread
+from time import monotonic
 
 from openai import (
     APIConnectionError, APIStatusError, APITimeoutError, AuthenticationError,
@@ -28,9 +31,11 @@ class OpenAITranscriptionConfig:
     timeout_seconds: float = 300.0
     max_retries: int = 2
     max_upload_bytes: int = 20 * 1024 * 1024
+    max_audio_duration_seconds: float = 1400.0
+    progress_interval_seconds: float = 15.0
 
     def __post_init__(self) -> None:
-        if self.timeout_seconds <= 0 or self.max_upload_bytes <= 0 or self.max_retries < 0:
+        if self.timeout_seconds <= 0 or self.max_upload_bytes <= 0 or self.max_audio_duration_seconds <= 0 or self.progress_interval_seconds <= 0 or self.max_retries < 0:
             raise ValueError("OpenAI transcription limits must be positive and retries non-negative")
         if self.response_format != "diarized_json":
             raise ValueError("Phase 3 requires diarized_json for Evidence timestamps and speakers")
@@ -40,6 +45,36 @@ def _field(value: Any, name: str) -> Any:
     if isinstance(value, dict):
         return value.get(name)
     return getattr(value, name, None)
+
+
+def _safe_provider_field(value: Any, *, limit: int = 500) -> str | None:
+    if value is None:
+        return None
+    text = re.sub(r"[\x00-\x1f\x7f]+", " ", str(value)).strip()
+    return text[:limit] or None
+
+
+def _status_error_details(exc: APIStatusError) -> tuple[str, dict[str, str | None]]:
+    body = exc.body if isinstance(exc.body, dict) else {}
+    error = body.get("error", body) if isinstance(body, dict) else {}
+    if not isinstance(error, dict):
+        error = {}
+    details = {
+        "provider_type": _safe_provider_field(error.get("type"), limit=100),
+        "provider_code": _safe_provider_field(error.get("code"), limit=100),
+        "provider_param": _safe_provider_field(error.get("param"), limit=100),
+        "request_id": _safe_provider_field(getattr(exc, "request_id", None), limit=100),
+    }
+    message = _safe_provider_field(error.get("message"))
+    parts = [f"OpenAI transcription failed with status {exc.status_code}"]
+    for label, key in (("type", "provider_type"), ("code", "provider_code"), ("param", "provider_param")):
+        if details[key]:
+            parts.append(f"{label}={details[key]}")
+    if message:
+        parts.append(f"message={message}")
+    if details["request_id"]:
+        parts.append(f"request_id={details['request_id']}")
+    return "; ".join(parts), details
 
 
 def normalize_diarized_segments(
@@ -74,8 +109,9 @@ def normalize_diarized_segments(
 
 
 class OpenAITranscriptionProvider:
-    def __init__(self, *, api_key: str | None, config: OpenAITranscriptionConfig | None = None, client: Any | None = None) -> None:
+    def __init__(self, *, api_key: str | None, config: OpenAITranscriptionConfig | None = None, client: Any | None = None, progress_callback: Callable[[str], None] | None = None) -> None:
         self.config = config or OpenAITranscriptionConfig()
+        self.progress_callback = progress_callback
         if client is None:
             if not api_key:
                 raise TranscriptionAuthenticationError("OpenAI API key is required")
@@ -111,17 +147,49 @@ class OpenAITranscriptionProvider:
             raise TranscriptionProviderError("OpenAI transcription connection failed", retryable=True) from exc
         except APIStatusError as exc:
             retryable = exc.status_code >= 500
-            raise TranscriptionProviderError(f"OpenAI transcription failed with status {exc.status_code}", retryable=retryable) from exc
+            message, details = _status_error_details(exc)
+            raise TranscriptionProviderError(message, retryable=retryable, **details) from exc
+
+    def _transcribe_with_progress(self, path: Path, *, index: int, total: int, duration: float) -> Any:
+        callback = self.progress_callback
+        if callback is None:
+            return self._transcribe_file(path)
+        started = monotonic()
+        stop = Event()
+        size = path.stat().st_size
+        label = f"Transcribing chunk {index}/{total} ({duration:.1f}s, {size} bytes)"
+        callback(f"{label} started; timeout={self.config.timeout_seconds:.0f}s")
+
+        def heartbeat() -> None:
+            while not stop.wait(self.config.progress_interval_seconds):
+                callback(f"{label}... {monotonic() - started:.0f}s elapsed")
+
+        thread = Thread(target=heartbeat, name="transcription-progress", daemon=True)
+        thread.start()
+        try:
+            response = self._transcribe_file(path)
+        except BaseException:
+            callback(f"{label} stopped after {monotonic() - started:.1f}s")
+            raise
+        finally:
+            stop.set()
+            thread.join(timeout=1)
+        callback(f"{label} completed in {monotonic() - started:.1f}s")
+        return response
 
     def transcribe(self, prepared_audio: PreparedAudio, meeting_id: str) -> TranscriptRecord:
-        items: list[tuple[Path, float, str | None]]
+        items: list[tuple[Path, float, str | None, float]]
         if prepared_audio.chunks:
-            items = [(chunk.path, chunk.start_seconds, chunk.chunk_id) for chunk in prepared_audio.chunks]
+            items = [(chunk.path, chunk.start_seconds, chunk.chunk_id, chunk.duration_seconds) for chunk in prepared_audio.chunks]
         else:
-            items = [(prepared_audio.audio_path, 0.0, None)]
+            items = [(prepared_audio.audio_path, 0.0, None, prepared_audio.duration_seconds)]
         merged: list[tuple[float, float, str | None, str, int, int]] = []
-        for item_order, (path, offset, scope) in enumerate(items):
-            response = self._transcribe_file(path)
+        for item_order, (path, offset, scope, duration) in enumerate(items):
+            if duration > self.config.max_audio_duration_seconds:
+                raise TranscriptionProviderError(
+                    f"prepared audio duration {duration:.3f} seconds exceeds the configured Provider limit of {self.config.max_audio_duration_seconds:.3f} seconds"
+                )
+            response = self._transcribe_with_progress(path, index=item_order + 1, total=len(items), duration=duration)
             for segment in normalize_diarized_segments(response, offset_seconds=offset, speaker_scope=scope):
                 merged.append((*segment, item_order))
         merged.sort(key=lambda item: (item[0], item[5], item[4]))

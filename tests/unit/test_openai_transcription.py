@@ -73,6 +73,15 @@ def test_single_file_normalizes_japanese_speaker_and_request(tmp_path: Path) -> 
     assert "b" in call["file"].mode and client.transcriptions.files[0].closed
 
 
+def test_progress_reports_chunk_start_and_completion(tmp_path: Path) -> None:
+    messages: list[str] = []
+    client = FakeClient([response({"start": 0, "end": 1, "speaker": "A", "text": "確認"})])
+    provider = OpenAITranscriptionProvider(api_key=None, client=client, progress_callback=messages.append)
+    provider.transcribe(prepared(tmp_path), "m1")
+    assert "chunk 1/1" in messages[0] and "timeout=300s" in messages[0]
+    assert "completed" in messages[-1]
+
+
 def test_multiple_segments_are_chronological_with_unique_ids(tmp_path: Path) -> None:
     client = FakeClient([response(
         {"start": 2, "end": 3, "speaker": "B", "text": "後"},
@@ -121,6 +130,13 @@ def test_oversized_file_rejected_before_upload(tmp_path: Path) -> None:
     assert client.transcriptions.calls == []
 
 
+def test_provider_duration_limit_is_rejected_before_upload(tmp_path: Path) -> None:
+    client = FakeClient([])
+    with pytest.raises(TranscriptionProviderError, match="1400"):
+        OpenAITranscriptionProvider(api_key=None, client=client).transcribe(prepared(tmp_path, duration=1400.01), "m1")
+    assert client.transcriptions.calls == []
+
+
 def test_missing_key_is_explicit_and_secret_is_not_exposed() -> None:
     with pytest.raises(TranscriptionAuthenticationError, match="required") as exc:
         OpenAITranscriptionProvider(api_key=None)
@@ -145,3 +161,22 @@ def test_partial_chunk_failure_returns_no_record(tmp_path: Path) -> None:
     ])
     with pytest.raises(TranscriptionProviderError, match="chunk failed"):
         OpenAITranscriptionProvider(api_key=None, client=client).transcribe(prepared(tmp_path, chunks=True), "m1")
+
+
+def test_status_error_preserves_only_sanitized_diagnostics(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    class FakeStatusError(Exception):
+        status_code = 400
+        body = {"error": {"type": "invalid_request_error", "code": "invalid_value", "param": "file", "message": "unsupported audio\nvalue"}}
+        request_id = "req_test_123"
+
+    monkeypatch.setattr(adapter, "APIStatusError", FakeStatusError)
+    client = FakeClient([FakeStatusError("raw response must not be propagated")])
+    with pytest.raises(TranscriptionProviderError) as caught:
+        OpenAITranscriptionProvider(api_key=None, client=client).transcribe(prepared(tmp_path), "m1")
+    error = caught.value
+    assert error.provider_type == "invalid_request_error"
+    assert error.provider_code == "invalid_value"
+    assert error.provider_param == "file"
+    assert error.request_id == "req_test_123"
+    assert "unsupported audio value" in str(error)
+    assert "raw response must not be propagated" not in str(error)

@@ -43,13 +43,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("source must be an MP4 file")
     settings = Settings(_env_file=Path.cwd() / ".env")
     key = settings.openai_api_key
+    progress = lambda message: print(message, flush=True)
     try:
         if key is None or not key.get_secret_value():
             raise ConfigurationError("OPENAI_API_KEY is not configured")
-        transcription = OpenAITranscriptionProvider(api_key=key.get_secret_value(), config=OpenAITranscriptionConfig(model=settings.transcription_model, response_format=settings.transcription_response_format, language=settings.transcription_language, timeout_seconds=settings.openai_timeout_seconds, max_retries=settings.openai_max_retries, max_upload_bytes=settings.openai_max_upload_bytes))
+        transcription = OpenAITranscriptionProvider(api_key=key.get_secret_value(), config=OpenAITranscriptionConfig(model=settings.transcription_model, response_format=settings.transcription_response_format, language=settings.transcription_language, timeout_seconds=settings.openai_timeout_seconds, max_retries=settings.openai_max_retries, max_upload_bytes=settings.openai_max_upload_bytes), progress_callback=progress)
         analysis = OpenAIAnalysisProvider(api_key=key.get_secret_value(), config=OpenAIAnalysisConfig(model=settings.analysis_model, reasoning_effort=settings.analysis_reasoning_effort, timeout_seconds=settings.openai_timeout_seconds, max_retries=settings.openai_max_retries))
         sink = GoogleSheetsMeetingSink(GoogleSheetsConfig(spreadsheet_id=settings.google_sheets_spreadsheet_id, service_account_file=settings.google_service_account_file, meetings_sheet=settings.google_meetings_sheet, decisions_sheet=settings.google_decisions_sheet, action_items_sheet=settings.google_action_items_sheet, open_items_sheet=settings.google_open_items_sheet))
-        result = run_pipeline(source, args.meeting_id or _default_meeting_id(source), settings, transcription, analysis, sink)
+        result = run_pipeline(source, args.meeting_id or _default_meeting_id(source), settings, transcription, analysis, sink, progress=progress)
+    except KeyboardInterrupt:
+        print("meeting-process interrupted by user", file=sys.stderr, flush=True)
+        return 130
     except MeetingIntelligenceError as exc:
         print(f"meeting-process failed: {exc}", file=sys.stderr)
         return 1

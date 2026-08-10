@@ -70,9 +70,22 @@ class TranscriptionTimeoutError(TranscriptionError):
 class TranscriptionProviderError(TranscriptionError):
     """The Provider failed for a reason not represented more specifically."""
 
-    def __init__(self, message: str, *, retryable: bool = False) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        retryable: bool = False,
+        provider_type: str | None = None,
+        provider_code: str | None = None,
+        provider_param: str | None = None,
+        request_id: str | None = None,
+    ) -> None:
         super().__init__(message)
         self.retryable = retryable
+        self.provider_type = provider_type
+        self.provider_code = provider_code
+        self.provider_param = provider_param
+        self.request_id = request_id
 
 
 class TranscriptionResponseError(TranscriptionError):

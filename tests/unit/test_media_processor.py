@@ -38,6 +38,7 @@ def make_source(tmp_path: Path) -> Path:
 
 def test_command_construction_uses_argument_lists_and_safe_flags(tmp_path: Path) -> None:
     config = MediaProcessingConfig()
+    assert config.max_chunk_duration_seconds == 300
     extract = build_extract_command(tmp_path / "a b.mp4", tmp_path / "out.mp3", config)
     chunk = build_chunk_command(tmp_path / "out.mp3", tmp_path / "chunk.mp3", 1, 2, config)
     assert "-n" in extract and extract[-1].endswith("out.mp3")

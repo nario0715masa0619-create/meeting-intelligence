@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from meeting_intelligence.analysis.base import MeetingAnalysisProvider
 from meeting_intelligence.analysis.validation import validate_analysis_evidence
@@ -30,16 +31,28 @@ def run_pipeline(
     transcription_provider: TranscriptionProvider,
     analysis_provider: MeetingAnalysisProvider,
     meeting_sink,
+    progress: Callable[[str], None] | None = None,
 ) -> PipelineResult:
+    notify = progress or (lambda _: None)
     source = source_path.expanduser().resolve()
     stat = source.stat()
     source_media = MediaSource(path=source, file_name=source.name, size_bytes=stat.st_size, sha256=sha256_file(source))
+    notify("[1/5] Preparing audio")
     prepared = prepare_meeting_media(source, Path(settings.work_dir) / meeting_id, settings)
+    notify("[1/5] Audio preparation completed")
+    notify("[2/5] Starting transcription")
     transcript = transcribe_prepared_audio(prepared, meeting_id, transcription_provider)
+    notify("[2/5] Transcription completed")
+    notify("[3/5] Persisting canonical Transcript")
     artifacts = persist_meeting_transcript(transcript, source_media, prepared.duration_seconds, settings)
+    notify("[3/5] Canonical Transcript persisted")
+    notify("[4/5] Starting Meeting Analysis and Evidence validation")
     analysis = validate_analysis_evidence(analysis_provider.analyze(transcript), transcript)
+    notify("[4/5] Meeting Analysis validated")
+    notify("[5/5] Writing Google Sheets projection")
     meeting_sink.write(
         analysis,
         SheetsMeetingContext(source_file=source.name, transcript_path=str(artifacts.transcript_json_path.resolve())),
     )
+    notify("[5/5] Google Sheets projection completed")
     return PipelineResult(artifacts=artifacts, analysis=analysis)

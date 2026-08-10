@@ -62,7 +62,9 @@ Run the unit tests with:
 
 Install the system `ffmpeg` distribution so both `ffmpeg` and `ffprobe` are on PATH. Their executable paths can be overridden through `MI_FFMPEG_PATH` and `MI_FFPROBE_PATH`.
 
-Phase 2 prepares mono 16 kHz MP3 audio at 64 kbit/s. Thresholds, encoding settings, executable paths, and subprocess timeout are configurable. Existing artifacts are never silently overwritten, and source MP4 files are preserved.
+Phase 2 prepares mono 16 kHz MP3 audio at 64 kbit/s. Long audio is split into five-minute (300-second) chunks. This is comfortably below the 1,400-second Provider limit and was live-validated against a real meeting recording. Thresholds, encoding settings, executable paths, and subprocess timeout are configurable. Existing artifacts are never silently overwritten, and source MP4 files are preserved.
+
+The CLI prints each pipeline stage and, while waiting for a transcription response, emits a heartbeat every 15 seconds with the chunk number, duration, byte size, elapsed time, and configured timeout. The default OpenAI timeout is 300 seconds per five-minute chunk. `Ctrl+C` reports an explicit interruption and exits with code 130.
 
 ## OpenAI transcription
 

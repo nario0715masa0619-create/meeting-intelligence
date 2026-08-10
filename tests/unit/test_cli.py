@@ -37,7 +37,7 @@ def test_cli_composes_pipeline_without_exposing_secret(tmp_path: Path, monkeypat
     monkeypatch.setattr(cli, "OpenAITranscriptionProvider", lambda **_: object())
     monkeypatch.setattr(cli, "OpenAIAnalysisProvider", lambda **_: object())
     monkeypatch.setattr(cli, "GoogleSheetsMeetingSink", lambda *_: object())
-    monkeypatch.setattr(cli, "run_pipeline", lambda *args: SimpleNamespace(analysis=SimpleNamespace(meeting_id=args[1]), artifacts=SimpleNamespace(transcript_json_path=Path("output/transcript.json"))))
+    monkeypatch.setattr(cli, "run_pipeline", lambda *args, **kwargs: SimpleNamespace(analysis=SimpleNamespace(meeting_id=args[1]), artifacts=SimpleNamespace(transcript_json_path=Path("output/transcript.json"))))
     assert main([str(source), "--meeting-id", "m1"]) == 0
     output = capsys.readouterr()
     assert "completed: m1" in output.out
@@ -51,6 +51,6 @@ def test_cli_returns_failure_for_domain_error(tmp_path: Path, monkeypatch: pytes
     monkeypatch.setattr(cli, "OpenAITranscriptionProvider", lambda **_: object())
     monkeypatch.setattr(cli, "OpenAIAnalysisProvider", lambda **_: object())
     monkeypatch.setattr(cli, "GoogleSheetsMeetingSink", lambda *_: object())
-    monkeypatch.setattr(cli, "run_pipeline", lambda *_: (_ for _ in ()).throw(AnalysisProviderError("provider unavailable")))
+    monkeypatch.setattr(cli, "run_pipeline", lambda *_, **__: (_ for _ in ()).throw(AnalysisProviderError("provider unavailable")))
     assert main([str(source)]) == 1
     assert "provider unavailable" in capsys.readouterr().err
