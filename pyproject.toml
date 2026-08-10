@@ -24,4 +24,5 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 markers = [
     "live: calls a paid external API and runs only when explicitly selected with -m live",
+    "google_sheets_live: writes to the explicitly configured Google test spreadsheet",
 ]

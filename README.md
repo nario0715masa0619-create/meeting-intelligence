@@ -128,6 +128,14 @@ To set up Google Sheets:
 
 The integration creates or validates `Meetings`, `Decisions`, `Action Items`, and `Open Items` tabs. A meeting already present in `Meetings` produces no writes. Data rows are sent in one atomic `spreadsheets.batchUpdate`, with every value written as a string to prevent formula injection. Keep service-account JSON outside the Repository; matching filenames are ignored as an additional safeguard.
 
+The Google Sheets live acceptance test writes a uniquely identified row set to the spreadsheet configured in `.env`, reads it back, and leaves it in place. Use a dedicated test spreadsheet. Select only this live test with:
+
+```powershell
+.\.venv\Scripts\python -m pytest -m "live and google_sheets_live" -v -rs -p no:cacheprovider
+```
+
+Regular pytest runs force-skip it even when credentials are configured.
+
 ## Documentation
 
 - [Documentation index](docs/README.md)
