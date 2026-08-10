@@ -93,3 +93,47 @@ class OutputExistsError(OutputError):
 
 class OutputWriteError(OutputError):
     """The required artifact set could not be finalized."""
+
+
+class AnalysisError(MeetingIntelligenceError):
+    """Base meeting-analysis failure."""
+
+
+class AnalysisAuthenticationError(AnalysisError):
+    """Analysis Provider authentication failed without exposing credentials."""
+
+
+class AnalysisProviderError(AnalysisError):
+    """The analysis Provider request failed."""
+
+
+class AnalysisResponseError(AnalysisError):
+    """The analysis Provider returned invalid structured output."""
+
+
+class EvidenceValidationError(AnalysisError):
+    """Structured analysis contains missing or invalid Evidence references."""
+
+
+class GoogleSheetsError(MeetingIntelligenceError):
+    """Base Google Sheets integration failure."""
+
+
+class GoogleSheetsAuthenticationError(GoogleSheetsError):
+    """Service Account authentication failed without exposing credentials."""
+
+
+class GoogleSheetsPermissionError(GoogleSheetsError):
+    """The Service Account lacks access to the configured spreadsheet."""
+
+
+class GoogleSheetsSchemaError(GoogleSheetsError):
+    """The configured spreadsheet cannot satisfy the required tab schema."""
+
+
+class DuplicateMeetingError(GoogleSheetsError):
+    """The meeting_id already exists and no rows were appended."""
+
+
+class GoogleSheetsWriteError(GoogleSheetsError):
+    """The atomic spreadsheet data write failed."""

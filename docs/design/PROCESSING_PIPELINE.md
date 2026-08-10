@@ -2,6 +2,8 @@
 
 ## Batch pipeline
 
+Phase 5 begins only after canonical `transcript.json` exists. It loads that record without mutation, requests schema-constrained Meeting Understanding, validates every required Evidence reference against transcript segment IDs, then projects the validated result to Google Sheets. Schema verification and duplicate detection precede data writes; child rows and the `Meetings` marker are appended in one atomic batch, with the marker request last.
+
 One MP4 file is processed as one meeting after recording has ended.
 
 | Stage | Name | Responsibility |

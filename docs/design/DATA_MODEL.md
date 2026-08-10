@@ -50,6 +50,8 @@ Once a processing run finalizes `transcript.json`, that file is an immutable his
 
 ## Canonical Meeting Record
 
+Phase 5 uses a provider-independent typed `MeetingAnalysis` internally. Profile values retain `value`, `evidence_segment_ids`, `confidence`, and `review_required`; analysis processing metadata retains model, prompt version, and processing time. This phase does not persist `meeting.json`. Google Sheets is a lossy, human-readable Operational Projection and never replaces the Canonical Transcript as Primary Evidence.
+
 Required top-level shape:
 
 ```json

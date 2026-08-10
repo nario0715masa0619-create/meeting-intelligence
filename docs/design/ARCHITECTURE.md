@@ -99,6 +99,8 @@ Codex responsibilities may include repository understanding, source implementati
 
 ## Target repository structure
 
+Phase 5 realizes the existing Provider boundary with an OpenAI Responses API analysis adapter and a separate Google Sheets output adapter. Provider SDK types remain outside Domain models. Application orchestration validates Evidence before invoking the spreadsheet sink; the spreadsheet adapter owns credentials, tab schemas, duplicate detection, and atomic requests.
+
 The following is the intended future structure. Directories and files beyond the current documentation phase are shown as design targets only.
 
 ```text

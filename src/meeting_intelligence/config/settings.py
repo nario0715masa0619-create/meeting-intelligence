@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     transcription_model: str = "gpt-4o-transcribe-diarize"
     transcription_response_format: str = "diarized_json"
     transcription_language: str = "ja"
-    analysis_model: str = ""
+    analysis_model: str = "gpt-5.6-terra"
+    analysis_reasoning_effort: str = "low"
     ffmpeg_path: str = "ffmpeg"
     ffprobe_path: str = "ffprobe"
     audio_codec: str = "libmp3lame"
@@ -36,3 +37,9 @@ class Settings(BaseSettings):
     openai_timeout_seconds: float = 300.0
     openai_max_retries: int = 2
     openai_max_upload_bytes: int = 20 * 1024 * 1024
+    google_service_account_file: Path | None = Field(default=None, validation_alias="GOOGLE_SERVICE_ACCOUNT_FILE")
+    google_sheets_spreadsheet_id: str = Field(default="", validation_alias="GOOGLE_SHEETS_SPREADSHEET_ID")
+    google_meetings_sheet: str = "Meetings"
+    google_decisions_sheet: str = "Decisions"
+    google_action_items_sheet: str = "Action Items"
+    google_open_items_sheet: str = "Open Items"

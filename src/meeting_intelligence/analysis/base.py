@@ -1,8 +1,11 @@
 from typing import Protocol
-from meeting_intelligence.domain.meeting import MeetingRecord
+from meeting_intelligence.domain.analysis import MeetingAnalysis
 from meeting_intelligence.domain.transcript import TranscriptRecord
 
 
-class AnalysisProvider(Protocol):
-    def analyze(self, transcript: TranscriptRecord) -> MeetingRecord:
+class MeetingAnalysisProvider(Protocol):
+    def analyze(self, transcript: TranscriptRecord) -> MeetingAnalysis:
         ...
+
+
+AnalysisProvider = MeetingAnalysisProvider

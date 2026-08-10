@@ -20,7 +20,7 @@ Human-readable Output
 
 ## Implementation status
 
-Implementation Phase 4 persists a validated Canonical Transcript Record as immutable primary derived Evidence. Meeting analysis and full end-to-end CLI processing remain unimplemented.
+Implementation Phase 5 reads the immutable Canonical Transcript Record, produces validated structured Meeting Understanding through the OpenAI Responses API, and projects operational rows to Google Sheets. Full end-to-end CLI processing remains unimplemented.
 
 The final MVP UX goal is:
 
@@ -103,6 +103,30 @@ Original MP4
 ```
 
 Downstream meeting analysis must read but never rewrite `transcript.json` or `transcript.md`.
+
+## Meeting analysis and Google Sheets
+
+The default analysis model is `gpt-5.6-terra` with `low` reasoning effort. It returns a provider-independent structured result whose topics, decisions, action items, open items, and relationship-profile values reference canonical transcript segment IDs. The application rejects unknown or missing Evidence before any spreadsheet write. Phase 5 does not persist `meeting.json` and does not retain raw Provider responses.
+
+Configure local-only credentials and the target spreadsheet in the ignored Repository-root `.env` file:
+
+```text
+OPENAI_API_KEY=
+GOOGLE_SERVICE_ACCOUNT_FILE=C:\path\to\service-account.json
+GOOGLE_SHEETS_SPREADSHEET_ID=
+MI_ANALYSIS_MODEL=gpt-5.6-terra
+MI_ANALYSIS_REASONING_EFFORT=low
+```
+
+To set up Google Sheets:
+
+1. Create a Google Cloud project and enable the Google Sheets API.
+2. Create a service account and save its JSON credential outside the Repository.
+3. Create the target spreadsheet.
+4. Share that spreadsheet with the service-account email as an editor.
+5. Put the credential path and spreadsheet ID in `.env` as shown above.
+
+The integration creates or validates `Meetings`, `Decisions`, `Action Items`, and `Open Items` tabs. A meeting already present in `Meetings` produces no writes. Data rows are sent in one atomic `spreadsheets.batchUpdate`, with every value written as a string to prevent formula injection. Keep service-account JSON outside the Repository; matching filenames are ignored as an additional safeguard.
 
 ## Documentation
 
