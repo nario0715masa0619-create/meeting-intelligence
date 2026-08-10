@@ -4,6 +4,8 @@
 
 Phase 5 begins only after canonical `transcript.json` exists. It loads that record without mutation, requests schema-constrained Meeting Understanding, validates every required Evidence reference against transcript segment IDs, then projects the validated result to Google Sheets. Schema verification and duplicate detection precede data writes; child rows and the `Meetings` marker are appended in one atomic batch, with the marker request last.
 
+Phase 6 exposes this sequence through `meeting-process <MP4>`. The CLI is only the composition root: media, transcription, persistence, analysis, validation, and Sheets behavior remain in their existing Application and Adapter boundaries. Transcript artifacts are finalized before analysis and Sheets projection so a downstream failure cannot destroy Primary Evidence; such a failure still produces a nonzero command result and is not reported as full pipeline success.
+
 One MP4 file is processed as one meeting after recording has ended.
 
 | Stage | Name | Responsibility |

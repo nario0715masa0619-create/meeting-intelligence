@@ -20,22 +20,28 @@ Human-readable Output
 
 ## Implementation status
 
-Implementation Phase 5 reads the immutable Canonical Transcript Record, produces validated structured Meeting Understanding through the OpenAI Responses API, and projects operational rows to Google Sheets. Full end-to-end CLI processing remains unimplemented.
+Implementation Phase 6 composes media preparation, OpenAI transcription, immutable Transcript persistence, structured Meeting Understanding, Evidence validation, and Google Sheets projection behind one batch CLI command.
 
-The final MVP UX goal is:
+Run one Japanese MP4 meeting with:
 
 ```text
 meeting-process <video-file>
 ```
 
-In Phase 1, only help and version behavior are implemented:
+Use an explicit stable identifier when the filename is unsuitable or when operational naming must be controlled:
+
+```powershell
+meeting-process .\input\meeting.mp4 --meeting-id customer-meeting-2026-08-10
+```
+
+Help and version remain available:
 
 ```powershell
 meeting-process --help
 meeting-process --version
 ```
 
-Running the command without an option reports that the processing pipeline is not yet implemented.
+Running without a source prints help and performs no processing. A failed downstream analysis or Sheets projection returns a nonzero exit code and is never reported as completed. Canonical Transcript artifacts finalized before a downstream failure remain immutable Primary Evidence.
 
 ## Development setup
 
