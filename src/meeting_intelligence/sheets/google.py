@@ -66,6 +66,12 @@ class GoogleSheetsMeetingSink:
         result = self._execute(self.service.spreadsheets().values().get(spreadsheetId=self.config.spreadsheet_id, range=f"'{self.config.meetings_sheet}'!A:A"))
         return any(row and row[0] == meeting_id for row in result.get("values", [])[1:])
 
+    def contains(self, meeting_id: str) -> bool:
+        """Read-only existence check used by unattended state classification."""
+        metadata = self._metadata()
+        titles = {sheet["properties"]["title"] for sheet in metadata.get("sheets", [])}
+        return self._duplicate(meeting_id, titles)
+
     def initialize_schema(self) -> tuple[dict[str, int], dict[str, list[str]]]:
         metadata = self._metadata()
         sheets = {s["properties"]["title"]: s["properties"]["sheetId"] for s in metadata.get("sheets", [])}

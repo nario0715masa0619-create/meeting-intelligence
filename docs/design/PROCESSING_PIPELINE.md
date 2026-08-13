@@ -12,6 +12,8 @@ Phase 7 projects validated analysis through formal Japanese headers. `meeting-pr
 
 Phase 7.1 atomically persists `meeting-minutes.md` only after Evidence validation and before Sheets projection. Existing minutes fail explicitly and are never overwritten. Normal writes append a minutes reference; the explicit one-time migration path renames only the legacy `MTG全体の議事録` header and updates exactly one meeting-ID-matched row, with API read-back verification and no append.
 
+Phase 8 recursively discovers MP4 files in deterministic order, rejects unstable/zero-byte inputs, establishes source identity, then classifies local artifacts before invoking any paid work. `NEW` calls the existing full pipeline once. `TRANSCRIPT_COMPLETE` or `FAILED_RESUMABLE` calls the existing resume use case and never Media or Transcription. Local minutes plus read-only Sheets existence becomes `COMPLETE` and is skipped. Dry-run performs classification only and therefore reports locally complete analysis as `ANALYSIS_COMPLETE` when remote completion cannot be proven without an API call.
+
 One MP4 file is processed as one meeting after recording has ended.
 
 | Stage | Name | Responsibility |

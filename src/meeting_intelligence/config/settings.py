@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     schema_version: str = "0.1.0"
     output_dir: Path = Path("output")
     work_dir: Path = Path(".work")
+    inbox_root: Path | None = None
+    inbox_stable_age_seconds: float = Field(default=120.0, ge=0)
+    inbox_continue_on_meeting_failure: bool = True
     transcription_provider: str = "openai"
     analysis_provider: str = "openai"
     transcription_model: str = "gpt-4o-transcribe-diarize"

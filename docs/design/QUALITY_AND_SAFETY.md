@@ -12,6 +12,8 @@ Analysis resume preserves the same gate. Unknown Evidence IDs and affected analy
 
 After that gate passes, `meeting-minutes.md` is written through a flushed and fsynced temporary file followed by atomic publication. An existing destination fails explicitly; temporary files are cleaned after publication failure. Sheets receives only its reference/path. The explicit legacy-row migration requires exactly one matching meeting ID and verifies both the renamed header and replaced cell by reading them back.
 
+Inbox dry-run has no mutation and no external API access. Normal runs use an exclusive create-only lock, process one meeting at a time, retain sources in place, and never delete artifacts. Automatic stale-lock removal is prohibited; an operator must first establish that no runner is active. Per-run manifests are atomic and content-free. A single meeting failure is isolated by default, while configuration/authentication failures may stop the run.
+
 Full meeting minutes must cover the real discussion flow across long meetings without inventing empty-period topics or unsupported facts. They remain distinct from the short executive summary and concise key topics. Spreadsheet schema migration is permitted only for sheets without data rows; existing data plus a mismatched or unknown header fails closed. All projected text, including multiline minutes, continues to use `stringValue` to prevent formula evaluation.
 
 Before a Canonical Meeting Record is considered complete, validation must confirm:

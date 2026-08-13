@@ -101,6 +101,8 @@ Phase 7 explicitly separates `short_summary`, `full_meeting_minutes`, and `key_t
 
 Phase 7.1 preserves `full_meeting_minutes` in the analysis schema but projects it into `meeting-minutes.md`, not a long Google Sheets cell. The Sheets `議事録` value is `minutes_reference`, currently a local path and compatible with a future Drive URL without adding Drive integration now.
 
+Phase 8 Inbox state is operational, not part of the Canonical Meeting Record. Source identity consists of absolute path, byte size, and SHA-256. Run manifests contain only identity, meeting ID, initial/final state, timestamps, and sanitized failures. They contain no Transcript or analysis content.
+
 ### Topic
 
 Each Topic contains:

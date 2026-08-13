@@ -103,6 +103,8 @@ Phase 5 realizes the existing Provider boundary with an OpenAI Responses API ana
 
 Phase 7 defines Google Sheets as four responsibility-specific Operational Projections. Phase 7.1 keeps detailed full minutes in the local `meeting-minutes.md` artifact and makes the `Meetings` sheet an index containing its abstract reference/path alongside meeting-level summary, relationship information, and key topics. `Decisions`, `Action Items`, and `Open Items` contain only their respective detail records. Internal IDs remain in Domain models but are not formal spreadsheet columns.
 
+Phase 8 adds an Application-layer Inbox orchestrator. It discovers stable MP4 sources and composes the existing full-pipeline and analysis-resume use cases; it does not duplicate Media, Provider, Evidence, minutes, or Sheets logic. Processing is sequential and guarded by one exclusive runner lock. The CLI remains the composition root.
+
 The following is the intended future structure. Directories and files beyond the current documentation phase are shown as design targets only.
 
 ```text

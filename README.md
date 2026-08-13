@@ -67,6 +67,34 @@ Run the unit tests with:
 .\.venv\Scripts\python -m pytest
 ```
 
+## Inbox automation
+
+Set the formal recursive MP4 Inbox in the ignored Repository-root `.env`:
+
+```text
+MI_INBOX_ROOT=D:\work\.meeting-intelligence
+MI_INBOX_STABLE_AGE_SECONDS=120
+MI_INBOX_CONTINUE_ON_MEETING_FAILURE=true
+```
+
+Preview deterministic meeting IDs and local processing state without filesystem mutation, ffmpeg, OpenAI, or Google API calls:
+
+```powershell
+meeting-process inbox --dry-run
+```
+
+Process stable files sequentially with:
+
+```powershell
+meeting-process inbox
+```
+
+Discovery is recursive, case-insensitive for the `.mp4` suffix, Unicode-safe, and deterministically ordered by relative path. Identity uses absolute source path, size, and SHA-256. Meeting IDs are derived from the relative path; a hash suffix is added only when an existing output collides. Files newer than the configured stability window and zero-byte files are blocked.
+
+The state model is `NEW`, `TRANSCRIPT_COMPLETE`, `ANALYSIS_COMPLETE`, `COMPLETE`, `FAILED_RESUMABLE`, and `BLOCKED`. Existing canonical Transcript artifacts always take the resume path and are never retranscribed. `COMPLETE` requires both local minutes and a read-only Google Sheets meeting-ID match; normal Inbox processing then performs zero paid/API processing calls. Because dry-run forbids every API call, local minutes without an Inbox completion receipt are conservatively shown as `ANALYSIS_COMPLETE` rather than guessed to be complete.
+
+One runner-wide Windows-compatible exclusive lock prevents concurrent processing. Locks are never automatically declared stale because PID reuse and slow paid calls make automatic deletion unsafe; after confirming no runner exists, an operator may remove `.work/inbox.lock`. Non-dry runs write content-free manifests under `.work/inbox-runs/`. They contain source paths, meeting IDs, states, timestamps, and sanitized errors, never Transcript text or credentials. Sources and completed artifacts are never moved, overwritten, or deleted. The default isolates a meeting failure and continues sequentially; configuration/setup failures use exit code `2`, meeting failures use `1`, and safe all-processed/skipped completion uses `0`.
+
 ## Media prerequisite
 
 Install the system `ffmpeg` distribution so both `ffmpeg` and `ffprobe` are on PATH. Their executable paths can be overridden through `MI_FFMPEG_PATH` and `MI_FFPROBE_PATH`.

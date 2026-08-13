@@ -9,6 +9,7 @@ import sys
 from meeting_intelligence import __version__
 from meeting_intelligence.analysis.openai import OpenAIAnalysisConfig, OpenAIAnalysisProvider
 from meeting_intelligence.application.pipeline import run_pipeline
+from meeting_intelligence.application.inbox import run_inbox
 from meeting_intelligence.application.resume import load_transcript_record, migrate_analysis_minutes, resume_analysis
 from meeting_intelligence.config.settings import Settings
 from meeting_intelligence.domain.errors import ConfigurationError, MeetingIntelligenceError
@@ -20,7 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="meeting-process",
         description="Process one meeting recording, or resume analysis from a persisted transcript.",
-        epilog="Resume: meeting-process analyze <transcript.json> [--meeting-id ID]. One-time migration: meeting-process migrate-minutes <transcript.json> --meeting-id ID.",
+        epilog="Inbox: meeting-process inbox [--dry-run]. Resume: meeting-process analyze <transcript.json> [--meeting-id ID]. One-time migration: meeting-process migrate-minutes <transcript.json> --meeting-id ID.",
     )
     parser.add_argument("source", nargs="?", type=Path, help="Japanese meeting MP4 file")
     parser.add_argument("--meeting-id", help="Stable output and Sheets identifier; defaults to the source filename")
@@ -53,6 +54,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _main_init_sheets(raw_args[1:])
     if raw_args and raw_args[0] == "migrate-minutes":
         return _main_migrate_minutes(raw_args[1:])
+    if raw_args and raw_args[0] == "inbox":
+        return _main_inbox(raw_args[1:])
     parser = build_parser()
     args = parser.parse_args(raw_args)
     if args.source is None:
@@ -195,6 +198,63 @@ def _main_migrate_minutes(argv: Sequence[str]) -> int:
     print(f"completed: {result.analysis.meeting_id}")
     print(f"meeting minutes: {result.meeting_minutes_path}")
     return 0
+
+
+def _main_inbox(argv: Sequence[str]) -> int:
+    parser = argparse.ArgumentParser(
+        prog="meeting-process inbox",
+        description="Sequentially process stable unprocessed MP4 files from the configured Inbox.",
+    )
+    parser.add_argument("--dry-run", action="store_true", help="Classify files without API calls or filesystem mutation")
+    args = parser.parse_args(argv)
+    settings = Settings(_env_file=Path.cwd() / ".env")
+    if settings.inbox_root is None:
+        print("meeting-process inbox failed: MI_INBOX_ROOT is not configured", file=sys.stderr)
+        return 2
+    progress = lambda message: print(message, flush=True)
+    transcription = analysis = sink = None
+    try:
+        if not args.dry_run:
+            key = settings.openai_api_key
+            if key is None or not key.get_secret_value():
+                raise ConfigurationError("OPENAI_API_KEY is not configured")
+            transcription = OpenAITranscriptionProvider(api_key=key.get_secret_value(), config=OpenAITranscriptionConfig(model=settings.transcription_model, response_format=settings.transcription_response_format, language=settings.transcription_language, timeout_seconds=settings.openai_timeout_seconds, max_retries=settings.openai_max_retries, max_upload_bytes=settings.openai_max_upload_bytes), progress_callback=progress)
+            analysis = OpenAIAnalysisProvider(api_key=key.get_secret_value(), config=OpenAIAnalysisConfig(model=settings.analysis_model, reasoning_effort=settings.analysis_reasoning_effort, timeout_seconds=settings.openai_timeout_seconds, max_retries=settings.openai_max_retries))
+            sink = GoogleSheetsMeetingSink(GoogleSheetsConfig(spreadsheet_id=settings.google_sheets_spreadsheet_id, service_account_file=settings.google_service_account_file, meetings_sheet=settings.google_meetings_sheet, decisions_sheet=settings.google_decisions_sheet, action_items_sheet=settings.google_action_items_sheet, open_items_sheet=settings.google_open_items_sheet))
+
+        def process_new(source: Path, meeting_id: str) -> None:
+            run_pipeline(source, meeting_id, settings, transcription, analysis, sink, progress=progress)
+
+        def resume_existing(transcript: Path, meeting_id: str) -> None:
+            resume_analysis(transcript, analysis, sink, expected_meeting_id=meeting_id, max_attempts=settings.analysis_evidence_max_attempts, progress=progress)
+
+        summary = run_inbox(
+            settings.inbox_root,
+            Path(settings.output_dir),
+            Path(settings.work_dir),
+            stable_age_seconds=settings.inbox_stable_age_seconds,
+            dry_run=args.dry_run,
+            continue_on_failure=settings.inbox_continue_on_meeting_failure,
+            process_new=None if args.dry_run else process_new,
+            resume=None if args.dry_run else resume_existing,
+            sheet_contains=None if args.dry_run else sink.contains,
+            progress=progress,
+        )
+    except KeyboardInterrupt:
+        print("meeting-process inbox interrupted by user", file=sys.stderr, flush=True)
+        return 130
+    except ConfigurationError as exc:
+        print(f"meeting-process inbox failed: {exc}", file=sys.stderr)
+        return 2
+    except MeetingIntelligenceError as exc:
+        print(f"meeting-process inbox failed: {exc}", file=sys.stderr)
+        return 1
+    print("Inbox summary")
+    print(f"Processed: {summary.processed}")
+    print(f"Resumed: {summary.resumed}")
+    print(f"Skipped: {summary.skipped}")
+    print(f"Failed: {summary.failed}")
+    return 1 if summary.failed else 0
 
 
 if __name__ == "__main__":

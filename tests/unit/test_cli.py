@@ -26,6 +26,8 @@ def fake_settings() -> SimpleNamespace:
         transcription_language="ja", openai_timeout_seconds=1, openai_max_retries=0, openai_max_upload_bytes=100,
         analysis_model="analysis", analysis_reasoning_effort="low", google_sheets_spreadsheet_id="sheet",
         analysis_evidence_max_attempts=2,
+        inbox_root=Path("inbox"), inbox_stable_age_seconds=120, inbox_continue_on_meeting_failure=True,
+        output_dir=Path("output"), work_dir=Path(".work"),
         google_service_account_file=Path("credential.json"), google_meetings_sheet="Meetings",
         google_decisions_sheet="Decisions", google_action_items_sheet="Action Items", google_open_items_sheet="Open Items",
     )
@@ -78,3 +80,18 @@ def test_analyze_command_never_constructs_transcription_provider(tmp_path: Path,
         ),
     )
     assert main(["analyze", str(transcript)]) == 0
+
+
+def test_inbox_dry_run_constructs_no_provider_and_passes_no_callbacks(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "Settings", lambda **_: fake_settings())
+    monkeypatch.setattr(cli, "OpenAITranscriptionProvider", lambda **_: pytest.fail("transcription provider constructed"))
+    monkeypatch.setattr(cli, "OpenAIAnalysisProvider", lambda **_: pytest.fail("analysis provider constructed"))
+    monkeypatch.setattr(cli, "GoogleSheetsMeetingSink", lambda *_: pytest.fail("Sheets sink constructed"))
+    def fake_run(*args, **kwargs):
+        assert kwargs["dry_run"] is True
+        assert kwargs["process_new"] is None
+        assert kwargs["resume"] is None
+        assert kwargs["sheet_contains"] is None
+        return SimpleNamespace(processed=0, resumed=0, skipped=1, failed=0)
+    monkeypatch.setattr(cli, "run_inbox", fake_run)
+    assert main(["inbox", "--dry-run"]) == 0
