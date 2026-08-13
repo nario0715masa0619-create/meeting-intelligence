@@ -66,9 +66,22 @@ class GoogleSheetsMeetingSink:
         result = self._execute(self.service.spreadsheets().values().get(spreadsheetId=self.config.spreadsheet_id, range=f"'{self.config.meetings_sheet}'!A:A"))
         return any(row and row[0] == meeting_id for row in result.get("values", [])[1:])
 
-    def _ensure_schema(self, metadata: dict) -> tuple[dict[str, int], dict[str, list[str]]]:
+    def initialize_schema(self) -> tuple[dict[str, int], dict[str, list[str]]]:
+        metadata = self._metadata()
         sheets = {s["properties"]["title"]: s["properties"]["sheetId"] for s in metadata.get("sheets", [])}
         missing = [name for name in self.config.names.values() if name not in sheets]
+        inspected: dict[str, list[list[str]]] = {}
+        for canonical, actual in self.config.names.items():
+            if actual not in sheets:
+                inspected[actual] = []
+                continue
+            current = self._execute(self.service.spreadsheets().values().get(spreadsheetId=self.config.spreadsheet_id, range=f"'{actual}'!A:ZZ")).get("values", [])
+            existing = list(current[0]) if current else []
+            if len(existing) != len(set(existing)):
+                raise GoogleSheetsSchemaError(f"Google Sheet '{actual}' has duplicate headers")
+            if any(any(str(value) for value in row) for row in current[1:]) and existing != HEADERS[canonical]:
+                raise GoogleSheetsSchemaError(f"Google Sheet '{actual}' has data and cannot be migrated destructively")
+            inspected[actual] = current
         if missing:
             requests = [{"addSheet": {"properties": {"title": name}}} for name in missing]
             self._execute(self.service.spreadsheets().batchUpdate(spreadsheetId=self.config.spreadsheet_id, body={"requests": requests}))
@@ -77,19 +90,20 @@ class GoogleSheetsMeetingSink:
         header_requests = []
         columns = {}
         for canonical, actual in self.config.names.items():
-            current = self._execute(self.service.spreadsheets().values().get(spreadsheetId=self.config.spreadsheet_id, range=f"'{actual}'!1:1")).get("values", [])
+            current = inspected[actual]
             required = HEADERS[canonical]
             existing = list(current[0]) if current else []
-            if len(existing) != len(set(existing)):
-                raise GoogleSheetsSchemaError(f"Google Sheet '{actual}' has duplicate headers")
-            missing_headers = [header for header in required if header not in existing]
-            final = existing + missing_headers
-            columns[actual] = final
-            if missing_headers:
-                start = len(existing)
-                header_requests.append({"updateCells": {"range": {"sheetId": sheets[actual], "startRowIndex": 0, "endRowIndex": 1, "startColumnIndex": start}, "rows": [{"values": [self._cell(x) for x in missing_headers]}], "fields": "userEnteredValue"}})
+            columns[actual] = required
+            if existing != required:
+                width = max(len(existing), len(required))
+                values = [self._cell(value) for value in required] + [{} for _ in range(width - len(required))]
+                header_requests.append({"updateCells": {"range": {"sheetId": sheets[actual], "startRowIndex": 0, "endRowIndex": 1, "startColumnIndex": 0, "endColumnIndex": width}, "rows": [{"values": values}], "fields": "userEnteredValue"}})
         if header_requests:
             self._execute(self.service.spreadsheets().batchUpdate(spreadsheetId=self.config.spreadsheet_id, body={"requests": header_requests}))
+        for canonical, actual in self.config.names.items():
+            read_back = self._execute(self.service.spreadsheets().values().get(spreadsheetId=self.config.spreadsheet_id, range=f"'{actual}'!1:1")).get("values", [])
+            if not read_back or list(read_back[0]) != HEADERS[canonical]:
+                raise GoogleSheetsSchemaError(f"Google Sheet '{actual}' header read-back verification failed")
         return sheets, columns
 
     def write(self, analysis: MeetingAnalysis, context: SheetsMeetingContext | None = None) -> None:
@@ -97,7 +111,7 @@ class GoogleSheetsMeetingSink:
         titles = {s["properties"]["title"] for s in metadata.get("sheets", [])}
         if self._duplicate(analysis.meeting_id, titles):
             raise DuplicateMeetingError("Meeting has already been projected")
-        sheet_ids, columns = self._ensure_schema(metadata)
+        sheet_ids, columns = self.initialize_schema()
         if self._duplicate(analysis.meeting_id, set(sheet_ids)):
             raise DuplicateMeetingError("Meeting has already been projected")
         projection = project_analysis(analysis, self.config.names, context)
@@ -112,3 +126,83 @@ class GoogleSheetsMeetingSink:
                 requests.append({"appendCells": {"sheetId": sheet_ids[name], "rows": [{"values": [self._cell(v) for v in row]} for row in mapped_rows], "fields": "userEnteredValue"}})
         if requests:
             self._execute(self.service.spreadsheets().batchUpdate(spreadsheetId=self.config.spreadsheet_id, body={"requests": requests}))
+
+    def migrate_minutes_reference(self, meeting_id: str, minutes_reference: str) -> None:
+        """Rename the one legacy header and update exactly one existing meeting row."""
+        if not meeting_id or not minutes_reference:
+            raise GoogleSheetsSchemaError("meeting_id and minutes_reference are required for migration")
+        metadata = self._metadata()
+        sheets = {s["properties"]["title"]: s["properties"]["sheetId"] for s in metadata.get("sheets", [])}
+        title = self.config.meetings_sheet
+        if title not in sheets:
+            raise GoogleSheetsSchemaError("Meetings sheet does not exist")
+        values = self._execute(
+            self.service.spreadsheets().values().get(
+                spreadsheetId=self.config.spreadsheet_id,
+                range=f"'{title}'!A:ZZ",
+            )
+        ).get("values", [])
+        if not values:
+            raise GoogleSheetsSchemaError("Meetings sheet is empty")
+        header = list(values[0])
+        if len(header) != len(set(header)):
+            raise GoogleSheetsSchemaError("Meetings sheet has duplicate headers")
+        try:
+            meeting_column = header.index("ミーティングID")
+        except ValueError as exc:
+            raise GoogleSheetsSchemaError("Meetings sheet has no meeting ID column") from exc
+        legacy = "MTG全体の議事録"
+        current = "議事録"
+        if legacy in header and current in header:
+            raise GoogleSheetsSchemaError("Meetings sheet has ambiguous minutes headers")
+        try:
+            minutes_column = header.index(current if current in header else legacy)
+        except ValueError as exc:
+            raise GoogleSheetsSchemaError("Meetings sheet has no supported minutes column") from exc
+        matching_rows = [index for index, row in enumerate(values[1:], start=1) if len(row) > meeting_column and row[meeting_column] == meeting_id]
+        if len(matching_rows) != 1:
+            raise GoogleSheetsSchemaError("migration requires exactly one matching meeting row")
+        row_index = matching_rows[0]
+        requests = []
+        if header[minutes_column] == legacy:
+            requests.append(self._single_cell_request(sheets[title], 0, minutes_column, current))
+        requests.append(self._single_cell_request(sheets[title], row_index, minutes_column, minutes_reference))
+        self._execute(
+            self.service.spreadsheets().batchUpdate(
+                spreadsheetId=self.config.spreadsheet_id,
+                body={"requests": requests},
+            )
+        )
+        read_back = self._execute(
+            self.service.spreadsheets().values().get(
+                spreadsheetId=self.config.spreadsheet_id,
+                range=f"'{title}'!A:ZZ",
+            )
+        ).get("values", [])
+        if len(read_back) <= row_index:
+            raise GoogleSheetsSchemaError("minutes migration read-back verification failed")
+        verified_header = list(read_back[0])
+        verified_row = list(read_back[row_index])
+        if (
+            len(verified_header) <= minutes_column
+            or verified_header[minutes_column] != current
+            or len(verified_row) <= minutes_column
+            or verified_row[minutes_column] != minutes_reference
+        ):
+            raise GoogleSheetsSchemaError("minutes migration read-back verification failed")
+
+    @classmethod
+    def _single_cell_request(cls, sheet_id: int, row_index: int, column_index: int, value: str) -> dict:
+        return {
+            "updateCells": {
+                "range": {
+                    "sheetId": sheet_id,
+                    "startRowIndex": row_index,
+                    "endRowIndex": row_index + 1,
+                    "startColumnIndex": column_index,
+                    "endColumnIndex": column_index + 1,
+                },
+                "rows": [{"values": [cls._cell(value)]}],
+                "fields": "userEnteredValue",
+            }
+        }

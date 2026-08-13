@@ -38,7 +38,7 @@ def test_cli_composes_pipeline_without_exposing_secret(tmp_path: Path, monkeypat
     monkeypatch.setattr(cli, "OpenAITranscriptionProvider", lambda **_: object())
     monkeypatch.setattr(cli, "OpenAIAnalysisProvider", lambda **_: object())
     monkeypatch.setattr(cli, "GoogleSheetsMeetingSink", lambda *_: object())
-    monkeypatch.setattr(cli, "run_pipeline", lambda *args, **kwargs: SimpleNamespace(analysis=SimpleNamespace(meeting_id=args[1]), artifacts=SimpleNamespace(transcript_json_path=Path("output/transcript.json"))))
+    monkeypatch.setattr(cli, "run_pipeline", lambda *args, **kwargs: SimpleNamespace(analysis=SimpleNamespace(meeting_id=args[1]), artifacts=SimpleNamespace(transcript_json_path=Path("output/transcript.json")), meeting_minutes_path=Path("output/meeting-minutes.md")))
     assert main([str(source), "--meeting-id", "m1"]) == 0
     output = capsys.readouterr()
     assert "completed: m1" in output.out
@@ -74,6 +74,7 @@ def test_analyze_command_never_constructs_transcription_provider(tmp_path: Path,
         lambda *args, **kwargs: SimpleNamespace(
             analysis=SimpleNamespace(meeting_id="m1"),
             transcript_path=transcript,
+            meeting_minutes_path=transcript.with_name("meeting-minutes.md"),
         ),
     )
     assert main(["analyze", str(transcript)]) == 0

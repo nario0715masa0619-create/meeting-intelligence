@@ -14,6 +14,7 @@ from meeting_intelligence.domain.analysis import MeetingAnalysis
 from meeting_intelligence.media.models import MediaSource
 from meeting_intelligence.media.tools import sha256_file
 from meeting_intelligence.output.transcript import TranscriptArtifacts
+from meeting_intelligence.output.meeting_minutes import MeetingMinutesContext, persist_meeting_minutes
 from meeting_intelligence.sheets.projection import SheetsMeetingContext
 from meeting_intelligence.transcription.base import TranscriptionProvider
 
@@ -22,6 +23,7 @@ from meeting_intelligence.transcription.base import TranscriptionProvider
 class PipelineResult:
     artifacts: TranscriptArtifacts
     analysis: MeetingAnalysis
+    meeting_minutes_path: Path
 
 
 def run_pipeline(
@@ -37,18 +39,18 @@ def run_pipeline(
     source = source_path.expanduser().resolve()
     stat = source.stat()
     source_media = MediaSource(path=source, file_name=source.name, size_bytes=stat.st_size, sha256=sha256_file(source))
-    notify("[1/6] Preparing audio")
+    notify("[1/7] Preparing audio")
     prepared = prepare_meeting_media(source, Path(settings.work_dir) / meeting_id, settings)
-    notify("[1/6] Audio preparation completed")
-    notify("[2/6] Starting transcription")
+    notify("[1/7] Audio preparation completed")
+    notify("[2/7] Starting transcription")
     transcript = transcribe_prepared_audio(prepared, meeting_id, transcription_provider)
-    notify("[2/6] Transcription completed")
-    notify("[3/6] Persisting canonical Transcript")
+    notify("[2/7] Transcription completed")
+    notify("[3/7] Persisting canonical Transcript")
     artifacts = persist_meeting_transcript(transcript, source_media, prepared.duration_seconds, settings)
-    notify("[3/6] Canonical Transcript persisted")
+    notify("[3/7] Canonical Transcript persisted")
 
     def analysis_progress(message: str) -> None:
-        stage = "[4/6]" if message.startswith("Analyzing") else "[5/6]"
+        stage = "[4/7]" if message.startswith("Analyzing") else "[5/7]"
         notify(f"{stage} {message}")
 
     analysis = analyze_transcript(
@@ -57,11 +59,21 @@ def run_pipeline(
         max_attempts=settings.analysis_evidence_max_attempts,
         progress=analysis_progress,
     )
-    notify("[5/6] Meeting Analysis evidence validated")
-    notify("[6/6] Writing Google Sheets projection")
+    notify("[5/7] Meeting Analysis evidence validated")
+    notify("[6/7] Persisting meeting-minutes.md")
+    minutes_path = persist_meeting_minutes(
+        analysis,
+        artifacts.directory,
+        MeetingMinutesContext(
+            transcript_path=artifacts.transcript_json_path.resolve(),
+            source_path=str(source),
+        ),
+    )
+    notify("[6/7] meeting-minutes.md persisted")
+    notify("[7/7] Writing Google Sheets projection")
     meeting_sink.write(
         analysis,
-        SheetsMeetingContext(source_file=source.name, transcript_path=str(artifacts.transcript_json_path.resolve())),
+        SheetsMeetingContext(source_file=source.name, transcript_path=str(artifacts.transcript_json_path.resolve()), minutes_reference=str(minutes_path)),
     )
-    notify("[6/6] Google Sheets projection completed")
-    return PipelineResult(artifacts=artifacts, analysis=analysis)
+    notify("[7/7] Google Sheets projection completed")
+    return PipelineResult(artifacts=artifacts, analysis=analysis, meeting_minutes_path=minutes_path)

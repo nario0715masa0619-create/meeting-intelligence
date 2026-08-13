@@ -10,7 +10,7 @@ from meeting_intelligence.domain.errors import AnalysisResponseError, DuplicateM
 from meeting_intelligence.domain.meeting import Decision, DecisionStatus, Quality, QualityStatus, Summary
 from meeting_intelligence.domain.transcript import TranscriptRecord
 from meeting_intelligence.sheets.google import GoogleSheetsConfig, GoogleSheetsMeetingSink
-from meeting_intelligence.sheets.projection import project_analysis
+from meeting_intelligence.sheets.projection import SheetsMeetingContext, project_analysis
 
 
 def transcript():
@@ -18,7 +18,7 @@ def transcript():
 
 
 def payload():
-    return MeetingAnalysisPayload(title="打合せ", meeting_profile=MeetingProfile(counterparty_names=[EvidenceBackedValue(value="山田", evidence_segment_ids=["s1"], confidence=.9, review_required=False)]), summary=Summary(overview="概要"), decisions=[Decision(id="d1", statement="実施", status=DecisionStatus.CONFIRMED, evidence_segment_ids=["s1"], confidence=.9, review_required=False)], quality=Quality(status=QualityStatus.PASS, review_required=False))
+    return MeetingAnalysisPayload(title="打合せ", short_summary="短い要約", full_meeting_minutes="■ 1. 冒頭\n日本語の議事録\n\n■ 2. 結論\n実施を決定", meeting_profile=MeetingProfile(counterparty_names=[EvidenceBackedValue(value="山田", evidence_segment_ids=["s1"], confidence=.9, review_required=False)]), summary=Summary(overview="概要"), decisions=[Decision(id="d1", statement="実施", status=DecisionStatus.CONFIRMED, evidence_segment_ids=["s1"], confidence=.9, review_required=False)], quality=Quality(status=QualityStatus.PASS, review_required=False))
 
 
 def analysis():
@@ -56,8 +56,10 @@ def test_evidence_validation_accepts_known_evidence_and_rejects_unknown():
 
 
 def test_projection_preserves_unicode_and_profile_values():
-    row = project_analysis(analysis()).rows["Meetings"][0]
+    row = project_analysis(analysis(), context=SheetsMeetingContext(minutes_reference="meeting-minutes.md")).rows["Meetings"][0]
     assert "打合せ" in row and "山田" in row
+    assert "短い要約" in row and row[7] == "meeting-minutes.md"
+    assert "日本語の議事録" not in row
 
 
 class Request:
@@ -66,17 +68,25 @@ class Request:
 
 
 class Values:
-    def __init__(self, duplicate=False): self.duplicate = duplicate
+    def __init__(self, duplicate=False): self.duplicate = duplicate; self.headers = {}
     def get(self, **kwargs):
         if "A:A" in kwargs["range"]: return Request({"values": [["meeting_id"], ["m1"]] if self.duplicate else [["meeting_id"]]})
-        return Request({"values": []})
+        title = kwargs["range"].split("'")[1]
+        return Request({"values": [self.headers[title]] if title in self.headers else []})
 
 
 class Spreadsheets:
     def __init__(self, duplicate=False): self.values_api=Values(duplicate); self.bodies=[]
     def get(self, **kwargs): return Request({"sheets": [{"properties":{"title":n,"sheetId":i}} for i,n in enumerate(["Meetings","Decisions","Action Items","Open Items"],1)]})
     def values(self): return self.values_api
-    def batchUpdate(self, **kwargs): self.bodies.append(kwargs["body"]); return Request({})
+    def batchUpdate(self, **kwargs):
+        self.bodies.append(kwargs["body"])
+        names = {i:n for i,n in enumerate(["Meetings","Decisions","Action Items","Open Items"],1)}
+        for request in kwargs["body"]["requests"]:
+            if "updateCells" in request:
+                update = request["updateCells"]
+                self.values_api.headers[names[update["range"]["sheetId"]]] = [cell.get("userEnteredValue", {}).get("stringValue", "") for cell in update["rows"][0]["values"]]
+        return Request({})
 
 
 class Service:

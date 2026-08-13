@@ -2,7 +2,7 @@
 
 ## Canonical data philosophy
 
-`transcript.json` is the Canonical Transcript Record and Canonical Primary Derived Evidence. `meeting.json` is the later Canonical Meeting Record and represents AI interpretation of that primary transcript. `meeting.md` and `transcript.md` are human-readable projections and must not be treated as sources of truth.
+`transcript.json` is the Canonical Transcript Record and Canonical Primary Derived Evidence. `meeting.json` is the later Canonical Meeting Record and represents AI interpretation of that primary transcript. `meeting-minutes.md` is the human-readable detailed-minutes artifact derived from validated `MeetingAnalysis`; it and `transcript.md` must not be treated as canonical sources of truth. Google Sheets stores only an abstract minutes reference/path.
 
 ```text
 Original MP4 = Original Evidence
@@ -96,6 +96,10 @@ The `summary` object contains:
 - `key_points[]`
 
 Summary supports human understanding. It is not the source of truth for Decisions.
+
+Phase 7 explicitly separates `short_summary`, `full_meeting_minutes`, and `key_topics`. `short_summary` is a 3–5 line executive summary. `full_meeting_minutes` is a multiline, structured, non-verbatim account of the discussion flow across the whole meeting. `key_topics` remains a concise list of important themes and is not expected to provide full coverage. None may add facts absent from the Transcript.
+
+Phase 7.1 preserves `full_meeting_minutes` in the analysis schema but projects it into `meeting-minutes.md`, not a long Google Sheets cell. The Sheets `議事録` value is `minutes_reference`, currently a local path and compatible with a future Drive URL without adding Drive integration now.
 
 ### Topic
 

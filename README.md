@@ -16,7 +16,7 @@ Canonical Structured Meeting Record
 Human-readable Output
 ```
 
-`transcript.json` is the Canonical Primary Derived Evidence. The future `meeting.json` is the Canonical Meeting Record for structured analysis, not a replacement for or correction of the primary transcript. Markdown files are human-readable projections, not canonical data.
+`transcript.json` is the Canonical Primary Derived Evidence. The future `meeting.json` is the Canonical Meeting Record for structured analysis, not a replacement for or correction of the primary transcript. `meeting-minutes.md` is the human-readable detailed minutes artifact; Google Sheets is an operational index rather than the minutes store.
 
 ## Implementation status
 
@@ -50,7 +50,7 @@ meeting-process analyze `
   "output\<meeting-id>\transcript.json"
 ```
 
-Add `--meeting-id <meeting-id>` to assert that the CLI input matches the Canonical Transcript. Analysis failure does not require retranscription. Resume validates the UTF-8 Canonical Transcript, performs only Meeting Analysis and Evidence validation, and writes Google Sheets only after all Evidence IDs pass strict validation. An unknown Evidence ID triggers at most one complete analysis correction retry (two total attempts); a second failure writes nothing.
+Add `--meeting-id <meeting-id>` to assert that the CLI input matches the Canonical Transcript. Analysis failure does not require retranscription. Resume validates the UTF-8 Canonical Transcript, performs only Meeting Analysis and Evidence validation, atomically creates `meeting-minutes.md`, and writes Google Sheets only after all Evidence IDs pass strict validation. An unknown Evidence ID triggers at most one complete analysis correction retry (two total attempts); a second failure writes nothing.
 
 ## Development setup
 
@@ -102,12 +102,14 @@ Phase 4 creates the following local outputs for one meeting:
 output/<meeting-id>/
 ├─ transcript.json
 ├─ transcript.md
-└─ metadata.json
+├─ metadata.json
+└─ meeting-minutes.md
 ```
 
 - `transcript.json` is the Canonical Primary Derived Evidence and source for downstream analysis.
 - `transcript.md` is a human-readable projection that does not correct or supplement the canonical transcript.
 - `metadata.json` records completed processing context, source traceability, and artifact hashes.
+- `meeting-minutes.md` is the structured, human-readable account of the entire meeting. It is created once after Evidence validation and is never silently overwritten.
 
 The output directory must not already exist. Phase 4 never silently overwrites or edits a completed transcript record. All three files are prepared in a temporary sibling directory and the meeting directory is finalized only after the complete artifact set is ready. The original MP4 is not copied or modified; its absolute source path and SHA-256 hash are retained in metadata.
 
@@ -115,8 +117,9 @@ The output directory must not already exist. Phase 4 never silently overwrites o
 Original MP4
   → transcript.json (Canonical Primary Derived Evidence)
   → transcript.md (human-readable projection)
+  → meeting-minutes.md (human-readable detailed minutes)
   → future meeting.json (AI interpretation)
-  → future meeting.md (human-readable projection)
+  → Google Sheets (operational index and management projection)
 ```
 
 Downstream meeting analysis must read but never rewrite `transcript.json` or `transcript.md`.
@@ -124,6 +127,24 @@ Downstream meeting analysis must read but never rewrite `transcript.json` or `tr
 ## Meeting analysis and Google Sheets
 
 The default analysis model is `gpt-5.6-terra` with `low` reasoning effort. It returns a provider-independent structured result whose topics, decisions, action items, open items, and relationship-profile values reference canonical transcript segment IDs. The application rejects unknown or missing Evidence before any spreadsheet write. Phase 5 does not persist `meeting.json` and does not retain raw Provider responses.
+
+Phase 7 separates the operational projection into four non-overlapping views:
+
+- `Meetings`: one row per meeting with relationship fields, a 3–5 line `ショート要約`, a `議事録` reference/path, and concise `主要論点`. The reference remains abstract so a future Google Drive URL can replace the local path without changing projection semantics.
+- `Decisions`: decision details only.
+- `Action Items`: executable task details only.
+- `Open Items`: unresolved and confirmation items only.
+
+Initialize or safely migrate empty formal sheets with `meeting-process init-sheets`. If any sheet has data rows and its header differs, initialization fails without rewriting it. Resume remains `meeting-process analyze "output\<meeting-id>\transcript.json"`; analysis failure never requires retranscription.
+
+Formal headers are:
+
+```text
+Meetings: ミーティングID, 日時, タイトル, お相手の名前, 紹介者名, その人のビジネス, ショート要約, 議事録, 主要論点, 具体的にギブしてくれる内容, ギブできる（こちらが紹介できる）人, 元動画, 文字起こし, 処理日時
+Decisions: ミーティングID, 決定事項, ステータス, Confidence, Review Required, Evidence
+Action Items: ミーティングID, アクション, 担当者, 期限, ステータス, Confidence, Review Required, Evidence
+Open Items: ミーティングID, 未決・確認事項, 理由, Confidence, Review Required, Evidence
+```
 
 The analysis prompt presents each segment as an explicit `[segment_id]`, speaker, timestamp, and text block. The model may use only IDs explicitly present in that input. `MI_ANALYSIS_EVIDENCE_MAX_ATTEMPTS` defaults to `2` and is capped at two total attempts.
 

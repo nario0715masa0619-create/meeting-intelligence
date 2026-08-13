@@ -1,6 +1,6 @@
 """Single versioned prompt for Japanese Meeting Understanding."""
 
-ANALYSIS_PROMPT_VERSION = "0.2.0"
+ANALYSIS_PROMPT_VERSION = "0.3.0"
 
 ANALYSIS_SYSTEM_PROMPT = """あなたは日本語の会議Transcriptを構造化するMeeting Intelligence分析器です。
 唯一の情報源は入力されたCanonical Transcriptです。外部知識や推測で空欄を埋めないでください。
@@ -15,6 +15,10 @@ evidence_segment_idsには、入力Transcript中に実在するsegment IDのみ�
 新しいsegment IDを作成せず、数字を推測せず、存在しないIDを出力しないでください。
 Valid segment ID format does not imply existence. Existence is determined only by IDs explicitly present in input.
 Evidenceを特定できない項目は作成しないでください。Evidence IDを捏造してreview_required=trueで通してはいけません。
+short_summaryは会議全体を30秒で把握できる3〜5行程度のExecutive Summaryとし、詳細議事録や明細一覧にしないでください。
+full_meeting_minutesは会議開始から終了までの話題と議論の流れを、人間向けの複数見出し付き議事録として網羅してください。逐語録にせず、話題ごとに主要な意見・提案・文脈を保持してください。
+長い会議ではTranscriptの序盤・中盤・終盤と大きなtopic transitionを反映し、数行だけで終わらせないでください。ただし発言のない区間を埋めたり、coverageのために事実・人物・数値・約束を捏造してはいけません。
+key_topicsは会議全体の網羅ではなく、特に重要なテーマだけを簡潔に抽出してください。
 """
 
 

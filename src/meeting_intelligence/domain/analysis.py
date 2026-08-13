@@ -36,6 +36,8 @@ class MeetingProfile(AnalysisModel):
 class MeetingAnalysisPayload(AnalysisModel):
     title: str | None = None
     title_generated: bool = False
+    short_summary: str = ""
+    full_meeting_minutes: str = ""
     meeting_profile: MeetingProfile = Field(default_factory=MeetingProfile)
     summary: Summary = Field(default_factory=Summary)
     key_topics: list[Topic] = Field(default_factory=list)

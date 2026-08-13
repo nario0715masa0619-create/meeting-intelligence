@@ -101,6 +101,8 @@ Codex responsibilities may include repository understanding, source implementati
 
 Phase 5 realizes the existing Provider boundary with an OpenAI Responses API analysis adapter and a separate Google Sheets output adapter. Provider SDK types remain outside Domain models. Application orchestration validates Evidence before invoking the spreadsheet sink; the spreadsheet adapter owns credentials, tab schemas, duplicate detection, and atomic requests.
 
+Phase 7 defines Google Sheets as four responsibility-specific Operational Projections. Phase 7.1 keeps detailed full minutes in the local `meeting-minutes.md` artifact and makes the `Meetings` sheet an index containing its abstract reference/path alongside meeting-level summary, relationship information, and key topics. `Decisions`, `Action Items`, and `Open Items` contain only their respective detail records. Internal IDs remain in Domain models but are not formal spreadsheet columns.
+
 The following is the intended future structure. Directories and files beyond the current documentation phase are shown as design targets only.
 
 ```text

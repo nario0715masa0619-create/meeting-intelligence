@@ -8,6 +8,10 @@ Phase 6 exposes this sequence through `meeting-process <MP4>`. The CLI is only t
 
 Phase 6.1 adds `meeting-process analyze <transcript.json>` as a resume path. It loads and validates the persisted Canonical Transcript without mutation, skips Media and Transcription entirely, and resumes at Meeting Analysis. An analysis that references unknown Segment IDs is regenerated once with only the invalid IDs and affected item identifiers as correction feedback. Both attempts use the same Canonical Transcript; validation must pass before the single Google Sheets write.
 
+Phase 7 projects validated analysis through formal Japanese headers. `meeting-process init-sheets` creates missing formal tabs and replaces legacy headers only when every affected sheet has no data rows. A differing header with existing data fails before schema mutation. Header writes are read back through the Google Sheets API before initialization is reported complete.
+
+Phase 7.1 atomically persists `meeting-minutes.md` only after Evidence validation and before Sheets projection. Existing minutes fail explicitly and are never overwritten. Normal writes append a minutes reference; the explicit one-time migration path renames only the legacy `MTG全体の議事録` header and updates exactly one meeting-ID-matched row, with API read-back verification and no append.
+
 One MP4 file is processed as one meeting after recording has ended.
 
 | Stage | Name | Responsibility |

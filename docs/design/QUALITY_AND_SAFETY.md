@@ -10,6 +10,10 @@ Before any Google Sheets write, Phase 5 rejects missing Evidence, unknown transc
 
 Analysis resume preserves the same gate. Unknown Evidence IDs and affected analysis items are reported without Transcript content, and Analysis may be regenerated only once. A second invalid result fails explicitly and produces no Sheets write. Resume reads but never rewrites `transcript.json`, `transcript.md`, or `metadata.json`, and it cannot invoke Media Processing or Transcription.
 
+After that gate passes, `meeting-minutes.md` is written through a flushed and fsynced temporary file followed by atomic publication. An existing destination fails explicitly; temporary files are cleaned after publication failure. Sheets receives only its reference/path. The explicit legacy-row migration requires exactly one matching meeting ID and verifies both the renamed header and replaced cell by reading them back.
+
+Full meeting minutes must cover the real discussion flow across long meetings without inventing empty-period topics or unsupported facts. They remain distinct from the short executive summary and concise key topics. Spreadsheet schema migration is permitted only for sheets without data rows; existing data plus a mismatched or unknown header fails closed. All projected text, including multiline minutes, continues to use `stringValue` to prevent formula evaluation.
+
 Before a Canonical Meeting Record is considered complete, validation must confirm:
 
 - top-level schema version `0.1.0` and required objects and collections;

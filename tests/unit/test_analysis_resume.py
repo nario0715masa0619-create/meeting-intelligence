@@ -12,7 +12,7 @@ from meeting_intelligence.domain.analysis import (
     MeetingAnalysis,
     MeetingProfile,
 )
-from meeting_intelligence.domain.errors import EvidenceValidationError, OutputValidationError
+from meeting_intelligence.domain.errors import EvidenceValidationError, OutputExistsError, OutputValidationError
 from meeting_intelligence.domain.meeting import (
     ActionItem,
     Decision,
@@ -182,7 +182,20 @@ def test_resume_writes_only_after_valid_retry_and_preserves_transcript(tmp_path:
     result = resume_analysis(path, provider, sink, expected_meeting_id="会議-1")
     assert result.analysis.meeting_id == "会議-1"
     assert len(sink.calls) == 1
+    assert sink.calls[0][1].minutes_reference.endswith("meeting-minutes.md")
+    assert result.meeting_minutes_path.is_file()
     assert path.read_bytes() == before
+
+
+def test_resume_uses_metadata_source_reference_without_rewriting_artifacts(tmp_path: Path) -> None:
+    path = tmp_path / "transcript.json"
+    write_transcript(path, transcript())
+    metadata = tmp_path / "metadata.json"
+    metadata.write_text('{"media":{"source_path":"D:/meeting.mp4"}}', encoding="utf-8")
+    sink = Sink()
+    resume_analysis(path, Provider([analysis()]), sink)
+    assert sink.calls[0][1].source_file == "D:/meeting.mp4"
+    assert metadata.read_text(encoding="utf-8") == '{"media":{"source_path":"D:/meeting.mp4"}}'
 
 
 def test_resume_never_writes_when_retry_fails(tmp_path: Path) -> None:
@@ -202,3 +215,15 @@ def test_resume_rejects_explicit_meeting_id_mismatch_before_analysis(tmp_path: P
     with pytest.raises(OutputValidationError):
         resume_analysis(path, provider, Sink(), expected_meeting_id="other")
     assert provider.feedback == []
+
+
+def test_resume_does_not_overwrite_existing_minutes_or_write_sheets(tmp_path: Path) -> None:
+    path = tmp_path / "transcript.json"
+    write_transcript(path, transcript())
+    minutes = tmp_path / "meeting-minutes.md"
+    minutes.write_text("existing", encoding="utf-8")
+    sink = Sink()
+    with pytest.raises(OutputExistsError):
+        resume_analysis(path, Provider([analysis()]), sink)
+    assert minutes.read_text(encoding="utf-8") == "existing"
+    assert sink.calls == []
