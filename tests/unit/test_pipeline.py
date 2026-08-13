@@ -36,7 +36,7 @@ def test_pipeline_preserves_phase_order_and_traceability(tmp_path: Path, monkeyp
             assert context.source_file == "meeting.mp4"
             assert context.transcript_path.endswith("transcript.json")
 
-    settings = SimpleNamespace(work_dir=tmp_path / "work")
+    settings = SimpleNamespace(work_dir=tmp_path / "work", analysis_evidence_max_attempts=2)
     result = pipeline.run_pipeline(source, "m1", settings, object(), Provider(), Sink())
     assert result.artifacts is artifacts
     assert calls == ["media", "transcription", "persistence", "analysis", "sheets"]

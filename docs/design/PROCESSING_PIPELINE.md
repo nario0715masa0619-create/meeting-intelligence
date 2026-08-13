@@ -6,6 +6,8 @@ Phase 5 begins only after canonical `transcript.json` exists. It loads that reco
 
 Phase 6 exposes this sequence through `meeting-process <MP4>`. The CLI is only the composition root: media, transcription, persistence, analysis, validation, and Sheets behavior remain in their existing Application and Adapter boundaries. Transcript artifacts are finalized before analysis and Sheets projection so a downstream failure cannot destroy Primary Evidence; such a failure still produces a nonzero command result and is not reported as full pipeline success.
 
+Phase 6.1 adds `meeting-process analyze <transcript.json>` as a resume path. It loads and validates the persisted Canonical Transcript without mutation, skips Media and Transcription entirely, and resumes at Meeting Analysis. An analysis that references unknown Segment IDs is regenerated once with only the invalid IDs and affected item identifiers as correction feedback. Both attempts use the same Canonical Transcript; validation must pass before the single Google Sheets write.
+
 One MP4 file is processed as one meeting after recording has ended.
 
 | Stage | Name | Responsibility |
@@ -116,6 +118,8 @@ Retries do not apply to:
 - invalid configuration.
 
 Infinite retry is prohibited. Retry decisions must be stage-aware, bounded, and reflected in processing metadata or failure reporting as appropriate.
+
+Evidence-grounding correction is separately bounded to two total Analysis attempts. It never retries Media or Transcription, never removes invalid Evidence to force success, and never writes Google Sheets after a failed validation attempt.
 
 ## Output finalization
 

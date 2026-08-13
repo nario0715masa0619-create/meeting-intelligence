@@ -33,14 +33,36 @@ class OpenAIAnalysisProvider:
             client = OpenAI(api_key=api_key, max_retries=self.config.max_retries)
         self.client = client
 
-    def analyze(self, transcript: TranscriptRecord) -> MeetingAnalysis:
+    @staticmethod
+    def _render_transcript(transcript: TranscriptRecord) -> str:
+        blocks = []
+        for segment in transcript.segments:
+            speaker = segment.speaker if segment.speaker is not None else "(unknown)"
+            blocks.append(
+                f"[{segment.id}]\n"
+                f"Speaker: {speaker}\n"
+                f"Start: {segment.start:.3f}\n"
+                f"End: {segment.end:.3f}\n"
+                f"Text: {segment.text}"
+            )
+        return "\n\n".join(blocks)
+
+    def analyze(
+        self,
+        transcript: TranscriptRecord,
+        *,
+        validation_feedback: str | None = None,
+    ) -> MeetingAnalysis:
+        user_content = self._render_transcript(transcript)
+        if validation_feedback:
+            user_content = f"{validation_feedback}\n\nCanonical Transcript:\n\n{user_content}"
         try:
             response = self.client.responses.parse(
                 model=self.config.model,
                 reasoning={"effort": self.config.reasoning_effort},
                 input=[
                     {"role": "system", "content": ANALYSIS_SYSTEM_PROMPT},
-                    {"role": "user", "content": transcript.model_dump_json()},
+                    {"role": "user", "content": user_content},
                 ],
                 text_format=MeetingAnalysisPayload,
                 timeout=self.config.timeout_seconds,

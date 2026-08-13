@@ -4,7 +4,12 @@ from meeting_intelligence.domain.transcript import TranscriptRecord
 
 
 class MeetingAnalysisProvider(Protocol):
-    def analyze(self, transcript: TranscriptRecord) -> MeetingAnalysis:
+    def analyze(
+        self,
+        transcript: TranscriptRecord,
+        *,
+        validation_feedback: str | None = None,
+    ) -> MeetingAnalysis:
         ...
 
 

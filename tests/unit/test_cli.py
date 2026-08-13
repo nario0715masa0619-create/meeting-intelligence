@@ -25,6 +25,7 @@ def fake_settings() -> SimpleNamespace:
         openai_api_key=Secret(), transcription_model="transcription", transcription_response_format="diarized_json",
         transcription_language="ja", openai_timeout_seconds=1, openai_max_retries=0, openai_max_upload_bytes=100,
         analysis_model="analysis", analysis_reasoning_effort="low", google_sheets_spreadsheet_id="sheet",
+        analysis_evidence_max_attempts=2,
         google_service_account_file=Path("credential.json"), google_meetings_sheet="Meetings",
         google_decisions_sheet="Decisions", google_action_items_sheet="Action Items", google_open_items_sheet="Open Items",
     )
@@ -54,3 +55,25 @@ def test_cli_returns_failure_for_domain_error(tmp_path: Path, monkeypatch: pytes
     monkeypatch.setattr(cli, "run_pipeline", lambda *_, **__: (_ for _ in ()).throw(AnalysisProviderError("provider unavailable")))
     assert main([str(source)]) == 1
     assert "provider unavailable" in capsys.readouterr().err
+
+
+def test_analyze_command_never_constructs_transcription_provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    transcript = tmp_path / "transcript.json"
+    transcript.write_text(
+        '{"schema_version":"0.1.0","meeting_id":"m1","language":"ja","duration_seconds":1,'
+        '"segments":[{"id":"seg_0001","start":0,"end":1,"speaker":null,"text":"日本語"}]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli, "Settings", lambda **_: fake_settings())
+    monkeypatch.setattr(cli, "OpenAITranscriptionProvider", lambda **_: pytest.fail("transcription provider constructed"))
+    monkeypatch.setattr(cli, "OpenAIAnalysisProvider", lambda **_: object())
+    monkeypatch.setattr(cli, "GoogleSheetsMeetingSink", lambda *_: object())
+    monkeypatch.setattr(
+        cli,
+        "resume_analysis",
+        lambda *args, **kwargs: SimpleNamespace(
+            analysis=SimpleNamespace(meeting_id="m1"),
+            transcript_path=transcript,
+        ),
+    )
+    assert main(["analyze", str(transcript)]) == 0

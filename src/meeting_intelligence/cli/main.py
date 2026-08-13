@@ -9,6 +9,7 @@ import sys
 from meeting_intelligence import __version__
 from meeting_intelligence.analysis.openai import OpenAIAnalysisConfig, OpenAIAnalysisProvider
 from meeting_intelligence.application.pipeline import run_pipeline
+from meeting_intelligence.application.resume import load_transcript_record, resume_analysis
 from meeting_intelligence.config.settings import Settings
 from meeting_intelligence.domain.errors import ConfigurationError, MeetingIntelligenceError
 from meeting_intelligence.sheets.google import GoogleSheetsConfig, GoogleSheetsMeetingSink
@@ -16,10 +17,24 @@ from meeting_intelligence.transcription.openai import OpenAITranscriptionConfig,
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="meeting-process", description="Process one meeting recording into canonical transcript artifacts and Google Sheets.")
+    parser = argparse.ArgumentParser(
+        prog="meeting-process",
+        description="Process one meeting recording, or resume analysis from a persisted transcript.",
+        epilog="Resume: meeting-process analyze <transcript.json> [--meeting-id ID]",
+    )
     parser.add_argument("source", nargs="?", type=Path, help="Japanese meeting MP4 file")
     parser.add_argument("--meeting-id", help="Stable output and Sheets identifier; defaults to the source filename")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    return parser
+
+
+def build_analyze_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="meeting-process analyze",
+        description="Resume Meeting Analysis and Google Sheets projection without transcription.",
+    )
+    parser.add_argument("transcript", type=Path, help="Persisted canonical transcript.json")
+    parser.add_argument("--meeting-id", help="Optional assertion matching transcript meeting_id")
     return parser
 
 
@@ -31,8 +46,11 @@ def _default_meeting_id(source: Path) -> str:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    raw_args = list(argv) if argv is not None else sys.argv[1:]
+    if raw_args and raw_args[0] == "analyze":
+        return _main_analyze(raw_args[1:])
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(raw_args)
     if args.source is None:
         parser.print_help()
         return 0
@@ -59,6 +77,53 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     print(f"completed: {result.analysis.meeting_id}")
     print(f"transcript: {result.artifacts.transcript_json_path}")
+    return 0
+
+
+def _main_analyze(argv: Sequence[str]) -> int:
+    args = build_analyze_parser().parse_args(argv)
+    settings = Settings(_env_file=Path.cwd() / ".env")
+    key = settings.openai_api_key
+    progress = lambda message: print(message, flush=True)
+    try:
+        load_transcript_record(args.transcript)
+        if key is None or not key.get_secret_value():
+            raise ConfigurationError("OPENAI_API_KEY is not configured")
+        analysis = OpenAIAnalysisProvider(
+            api_key=key.get_secret_value(),
+            config=OpenAIAnalysisConfig(
+                model=settings.analysis_model,
+                reasoning_effort=settings.analysis_reasoning_effort,
+                timeout_seconds=settings.openai_timeout_seconds,
+                max_retries=settings.openai_max_retries,
+            ),
+        )
+        sink = GoogleSheetsMeetingSink(
+            GoogleSheetsConfig(
+                spreadsheet_id=settings.google_sheets_spreadsheet_id,
+                service_account_file=settings.google_service_account_file,
+                meetings_sheet=settings.google_meetings_sheet,
+                decisions_sheet=settings.google_decisions_sheet,
+                action_items_sheet=settings.google_action_items_sheet,
+                open_items_sheet=settings.google_open_items_sheet,
+            )
+        )
+        result = resume_analysis(
+            args.transcript,
+            analysis,
+            sink,
+            expected_meeting_id=args.meeting_id,
+            max_attempts=settings.analysis_evidence_max_attempts,
+            progress=progress,
+        )
+    except KeyboardInterrupt:
+        print("meeting-process analyze interrupted by user", file=sys.stderr, flush=True)
+        return 130
+    except MeetingIntelligenceError as exc:
+        print(f"meeting-process analyze failed: {exc}", file=sys.stderr)
+        return 1
+    print(f"completed: {result.analysis.meeting_id}")
+    print(f"transcript: {result.transcript_path}")
     return 0
 
 

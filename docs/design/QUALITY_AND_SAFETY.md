@@ -8,6 +8,8 @@ Meeting Intelligence favors traceable, explicit records over polished but unsupp
 
 Before any Google Sheets write, Phase 5 rejects missing Evidence, unknown transcript segment IDs, duplicate extracted item IDs, and low-confidence items not marked for review. Credentials remain outside the Repository. Spreadsheet-bound Transcript and model text is written through `stringValue`, so leading `=`, `+`, `-`, or `@` is not evaluated as a formula. A duplicate `meeting_id` fails before schema or data mutation.
 
+Analysis resume preserves the same gate. Unknown Evidence IDs and affected analysis items are reported without Transcript content, and Analysis may be regenerated only once. A second invalid result fails explicitly and produces no Sheets write. Resume reads but never rewrites `transcript.json`, `transcript.md`, or `metadata.json`, and it cannot invoke Media Processing or Transcription.
+
 Before a Canonical Meeting Record is considered complete, validation must confirm:
 
 - top-level schema version `0.1.0` and required objects and collections;

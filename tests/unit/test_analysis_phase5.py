@@ -37,6 +37,10 @@ def test_openai_adapter_uses_structured_responses_and_low_reasoning():
     assert parse.kwargs["model"] == "gpt-5.6-terra"
     assert parse.kwargs["reasoning"] == {"effort": "low"}
     assert parse.kwargs["text_format"] is MeetingAnalysisPayload
+    content = parse.kwargs["input"][1]["content"]
+    assert "[s1]" in content
+    assert "Speaker: 話者A" in content
+    assert "Text: 導入します" in content
 
 
 def test_openai_adapter_rejects_missing_structured_output():

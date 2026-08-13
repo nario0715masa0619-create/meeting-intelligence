@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Callable
 
 from meeting_intelligence.analysis.base import MeetingAnalysisProvider
-from meeting_intelligence.analysis.validation import validate_analysis_evidence
+from meeting_intelligence.application.analysis import analyze_transcript
 from meeting_intelligence.application.media import prepare_meeting_media
 from meeting_intelligence.application.transcript_output import persist_meeting_transcript
 from meeting_intelligence.application.transcription import transcribe_prepared_audio
@@ -37,22 +37,31 @@ def run_pipeline(
     source = source_path.expanduser().resolve()
     stat = source.stat()
     source_media = MediaSource(path=source, file_name=source.name, size_bytes=stat.st_size, sha256=sha256_file(source))
-    notify("[1/5] Preparing audio")
+    notify("[1/6] Preparing audio")
     prepared = prepare_meeting_media(source, Path(settings.work_dir) / meeting_id, settings)
-    notify("[1/5] Audio preparation completed")
-    notify("[2/5] Starting transcription")
+    notify("[1/6] Audio preparation completed")
+    notify("[2/6] Starting transcription")
     transcript = transcribe_prepared_audio(prepared, meeting_id, transcription_provider)
-    notify("[2/5] Transcription completed")
-    notify("[3/5] Persisting canonical Transcript")
+    notify("[2/6] Transcription completed")
+    notify("[3/6] Persisting canonical Transcript")
     artifacts = persist_meeting_transcript(transcript, source_media, prepared.duration_seconds, settings)
-    notify("[3/5] Canonical Transcript persisted")
-    notify("[4/5] Starting Meeting Analysis and Evidence validation")
-    analysis = validate_analysis_evidence(analysis_provider.analyze(transcript), transcript)
-    notify("[4/5] Meeting Analysis validated")
-    notify("[5/5] Writing Google Sheets projection")
+    notify("[3/6] Canonical Transcript persisted")
+
+    def analysis_progress(message: str) -> None:
+        stage = "[4/6]" if message.startswith("Analyzing") else "[5/6]"
+        notify(f"{stage} {message}")
+
+    analysis = analyze_transcript(
+        transcript,
+        analysis_provider,
+        max_attempts=settings.analysis_evidence_max_attempts,
+        progress=analysis_progress,
+    )
+    notify("[5/6] Meeting Analysis evidence validated")
+    notify("[6/6] Writing Google Sheets projection")
     meeting_sink.write(
         analysis,
         SheetsMeetingContext(source_file=source.name, transcript_path=str(artifacts.transcript_json_path.resolve())),
     )
-    notify("[5/5] Google Sheets projection completed")
+    notify("[6/6] Google Sheets projection completed")
     return PipelineResult(artifacts=artifacts, analysis=analysis)

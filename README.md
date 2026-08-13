@@ -43,6 +43,15 @@ meeting-process --version
 
 Running without a source prints help and performs no processing. A failed downstream analysis or Sheets projection returns a nonzero exit code and is never reported as completed. Canonical Transcript artifacts finalized before a downstream failure remain immutable Primary Evidence.
 
+Resume analysis from a persisted transcript without repeating media processing or paid transcription:
+
+```powershell
+meeting-process analyze `
+  "output\<meeting-id>\transcript.json"
+```
+
+Add `--meeting-id <meeting-id>` to assert that the CLI input matches the Canonical Transcript. Analysis failure does not require retranscription. Resume validates the UTF-8 Canonical Transcript, performs only Meeting Analysis and Evidence validation, and writes Google Sheets only after all Evidence IDs pass strict validation. An unknown Evidence ID triggers at most one complete analysis correction retry (two total attempts); a second failure writes nothing.
+
 ## Development setup
 
 Python 3.11 or newer is required. Use a repository-local virtual environment:
@@ -115,6 +124,8 @@ Downstream meeting analysis must read but never rewrite `transcript.json` or `tr
 ## Meeting analysis and Google Sheets
 
 The default analysis model is `gpt-5.6-terra` with `low` reasoning effort. It returns a provider-independent structured result whose topics, decisions, action items, open items, and relationship-profile values reference canonical transcript segment IDs. The application rejects unknown or missing Evidence before any spreadsheet write. Phase 5 does not persist `meeting.json` and does not retain raw Provider responses.
+
+The analysis prompt presents each segment as an explicit `[segment_id]`, speaker, timestamp, and text block. The model may use only IDs explicitly present in that input. `MI_ANALYSIS_EVIDENCE_MAX_ATTEMPTS` defaults to `2` and is capped at two total attempts.
 
 Configure local-only credentials and the target spreadsheet in the ignored Repository-root `.env` file:
 

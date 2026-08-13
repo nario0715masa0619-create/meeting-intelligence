@@ -127,6 +127,19 @@ class AnalysisResponseError(AnalysisError):
 class EvidenceValidationError(AnalysisError):
     """Structured analysis contains missing or invalid Evidence references."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        invalid_ids: tuple[str, ...] = (),
+        affected_items: tuple[str, ...] = (),
+        attempts: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.invalid_ids = invalid_ids
+        self.affected_items = affected_items
+        self.attempts = attempts
+
 
 class GoogleSheetsError(MeetingIntelligenceError):
     """Base Google Sheets integration failure."""

@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     transcription_language: str = "ja"
     analysis_model: str = "gpt-5.6-terra"
     analysis_reasoning_effort: str = "low"
+    analysis_evidence_max_attempts: int = Field(default=2, ge=1, le=2)
     ffmpeg_path: str = "ffmpeg"
     ffprobe_path: str = "ffprobe"
     audio_codec: str = "libmp3lame"
