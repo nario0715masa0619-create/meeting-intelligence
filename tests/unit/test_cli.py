@@ -26,7 +26,7 @@ def fake_settings() -> SimpleNamespace:
         transcription_language="ja", openai_timeout_seconds=1, openai_max_retries=0, openai_max_upload_bytes=100,
         analysis_model="analysis", analysis_reasoning_effort="low", google_sheets_spreadsheet_id="sheet",
         analysis_evidence_max_attempts=2,
-        inbox_root=Path("inbox"), inbox_stable_age_seconds=120, inbox_continue_on_meeting_failure=True,
+        inbox_root=Path("inbox"), inbox_stable_age_seconds=120, inbox_folder_stable_age_seconds=120, inbox_continue_on_meeting_failure=True,
         output_dir=Path("output"), work_dir=Path(".work"),
         google_service_account_file=Path("credential.json"), google_meetings_sheet="Meetings",
         google_decisions_sheet="Decisions", google_action_items_sheet="Action Items", google_open_items_sheet="Open Items",

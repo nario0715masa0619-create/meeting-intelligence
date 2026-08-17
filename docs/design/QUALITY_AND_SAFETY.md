@@ -14,6 +14,8 @@ After that gate passes, `meeting-minutes.md` is written through a flushed and fs
 
 Inbox dry-run has no mutation and no external API access. Normal runs use an exclusive create-only lock, process one meeting at a time, retain sources in place, and never delete artifacts. Automatic stale-lock removal is prohibited; an operator must first establish that no runner is active. Per-run manifests are atomic and content-free. A single meeting failure is isolated by default, while configuration/authentication failures may stop the run.
 
+For a multi-file source, every MP4 and the containing folder must pass the stability window. The composite identity is rechecked through each part hash before persistence. If a previously processed folder gains, loses, or changes a part, unattended processing blocks rather than overwriting or charging for a replacement. Part-local speaker labels are never collapsed across files.
+
 Full meeting minutes must cover the real discussion flow across long meetings without inventing empty-period topics or unsupported facts. They remain distinct from the short executive summary and concise key topics. Spreadsheet schema migration is permitted only for sheets without data rows; existing data plus a mismatched or unknown header fails closed. All projected text, including multiline minutes, continues to use `stringValue` to prevent formula evaluation.
 
 Before a Canonical Meeting Record is considered complete, validation must confirm:

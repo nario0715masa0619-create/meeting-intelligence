@@ -4,7 +4,7 @@ from pathlib import Path
 
 from meeting_intelligence.config.settings import Settings
 from meeting_intelligence.domain.transcript import TranscriptRecord
-from meeting_intelligence.media.models import MediaSource
+from meeting_intelligence.media.models import MediaSource, MeetingSource
 from meeting_intelligence.output.transcript import (
     ProcessingContext,
     TranscriptArtifacts,
@@ -14,7 +14,7 @@ from meeting_intelligence.output.transcript import (
 
 def persist_meeting_transcript(
     transcript: TranscriptRecord,
-    source_media: MediaSource,
+    source_media: MediaSource | MeetingSource,
     source_duration_seconds: float,
     settings: Settings,
 ) -> TranscriptArtifacts:

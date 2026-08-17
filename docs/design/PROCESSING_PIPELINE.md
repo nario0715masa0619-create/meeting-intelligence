@@ -14,6 +14,8 @@ Phase 7.1 atomically persists `meeting-minutes.md` only after Evidence validatio
 
 Phase 8 recursively discovers MP4 files in deterministic order, rejects unstable/zero-byte inputs, establishes source identity, then classifies local artifacts before invoking any paid work. `NEW` calls the existing full pipeline once. `TRANSCRIPT_COMPLETE` or `FAILED_RESUMABLE` calls the existing resume use case and never Media or Transcription. Local minutes plus read-only Sheets existence becomes `COMPLETE` and is skipped. Dry-run performs classification only and therefore reports locally complete analysis as `ANALYSIS_COMPLETE` when remote completion cannot be proven without an API call.
 
+Phase 8.2 discovery yields MP4-containing folders rather than individual files. Parts are filename-sorted. Each part is prepared and transcribed in a part-scoped workspace. Cumulative prepared duration offsets every later part timestamp; segments are globally renumbered `seg_0001...`, and speaker labels are scoped `part_NNNN:<label>` without cross-part identity inference. Only the fully merged transcript is persisted and analyzed. Any part failure prevents final Canonical Transcript publication.
+
 One MP4 file is processed as one meeting after recording has ended.
 
 | Stage | Name | Responsibility |

@@ -14,8 +14,9 @@ def test_fake_new_processing_then_second_run_skips_without_provider_calls(tmp_pa
     os.utime(source, (1, 1))
     calls = []
 
-    def fake_pipeline(path: Path, meeting_id: str) -> None:
-        calls.append((path, meeting_id))
+    def fake_pipeline(source, meeting_id: str) -> None:
+        calls.append((source, meeting_id))
+        path = source.parts[0].path
         directory = output / meeting_id
         directory.mkdir(parents=True)
         (directory / "transcript.json").write_text("{}", encoding="utf-8")

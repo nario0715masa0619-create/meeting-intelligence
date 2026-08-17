@@ -74,6 +74,7 @@ Set the formal recursive MP4 Inbox in the ignored Repository-root `.env`:
 ```text
 MI_INBOX_ROOT=D:\work\.meeting-intelligence
 MI_INBOX_STABLE_AGE_SECONDS=120
+MI_INBOX_FOLDER_STABLE_AGE_SECONDS=120
 MI_INBOX_CONTINUE_ON_MEETING_FAILURE=true
 ```
 
@@ -90,6 +91,21 @@ meeting-process inbox
 ```
 
 Discovery is recursive, case-insensitive for the `.mp4` suffix, Unicode-safe, and deterministically ordered by relative path. Identity uses absolute source path, size, and SHA-256. Meeting IDs are derived from the relative path; a hash suffix is added only when an existing output collides. Files newer than the configured stability window and zero-byte files are blocked.
+
+Phase 8.2 uses **one folder = one meeting**. One MP4 remains the compatible single-file flow; two or more MP4 files directly inside the same folder are processed as ordered parts of one meeting:
+
+```text
+260817_single/
+└─ meeting.mp4
+
+260817_multi/
+├─ 01.mp4
+└─ 02.mp4
+```
+
+Parts are ordered lexically by filename, prepared and transcribed separately, then combined into one global timeline, one Canonical Transcript, one detailed minutes file, and one Google Sheets meeting. Original MP4 files are never physically merged or modified. The folder and every MP4 must remain unchanged for the configured stability window. This reduces but cannot eliminate a very late-arriving part; wait until all recording parts have been copied before running Inbox. A future explicit `.ready` marker can close that remaining ambiguity.
+
+Meeting source identity includes each ordered relative path, byte size, and SHA-256. Adding or changing a part after an earlier output blocks automatic processing instead of silently creating a replacement meeting.
 
 The state model is `NEW`, `TRANSCRIPT_COMPLETE`, `ANALYSIS_COMPLETE`, `COMPLETE`, `FAILED_RESUMABLE`, and `BLOCKED`. Existing canonical Transcript artifacts always take the resume path and are never retranscribed. `COMPLETE` requires both local minutes and a read-only Google Sheets meeting-ID match; normal Inbox processing then performs zero paid/API processing calls. Because dry-run forbids every API call, local minutes without an Inbox completion receipt are conservatively shown as `ANALYSIS_COMPLETE` rather than guessed to be complete.
 

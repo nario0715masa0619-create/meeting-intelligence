@@ -118,11 +118,12 @@ def test_dry_run_has_no_callbacks_lock_or_manifest(tmp_path: Path) -> None:
 def test_sequential_failure_isolation_and_summary(tmp_path: Path) -> None:
     inbox, output, work = tmp_path / "inbox", tmp_path / "output", tmp_path / "work"
     for name in ("a.mp4", "b.mp4", "c.mp4"):
-        mp4(inbox / name)
+        mp4(inbox / name.removesuffix(".mp4") / name)
     calls = []
     def process(path, meeting_id):
-        calls.append(path.name)
-        if path.name == "b.mp4":
+        name = path.parts[0].path.name
+        calls.append(name)
+        if name == "b.mp4":
             raise RuntimeError("safe failure")
     summary = run_inbox(inbox, output, work, stable_age_seconds=0, dry_run=False, continue_on_failure=True, process_new=process)
     assert calls == ["a.mp4", "b.mp4", "c.mp4"]

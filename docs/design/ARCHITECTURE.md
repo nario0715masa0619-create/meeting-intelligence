@@ -105,6 +105,8 @@ Phase 7 defines Google Sheets as four responsibility-specific Operational Projec
 
 Phase 8 adds an Application-layer Inbox orchestrator. It discovers stable MP4 sources and composes the existing full-pipeline and analysis-resume use cases; it does not duplicate Media, Provider, Evidence, minutes, or Sheets logic. Processing is sequential and guarded by one exclusive runner lock. The CLI remains the composition root.
 
+Phase 8.2 models a directory containing MP4 files as one provider-independent `MeetingSource`. Ordered parts pass through existing Media and Transcription boundaries independently; Application orchestration merges their local transcripts into one global Canonical Transcript before the single Analysis, minutes, and Sheets operations. No merged MP4 is produced.
+
 The following is the intended future structure. Directories and files beyond the current documentation phase are shown as design targets only.
 
 ```text

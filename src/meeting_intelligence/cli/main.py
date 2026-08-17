@@ -233,6 +233,7 @@ def _main_inbox(argv: Sequence[str]) -> int:
             Path(settings.output_dir),
             Path(settings.work_dir),
             stable_age_seconds=settings.inbox_stable_age_seconds,
+            folder_stable_age_seconds=settings.inbox_folder_stable_age_seconds,
             dry_run=args.dry_run,
             continue_on_failure=settings.inbox_continue_on_meeting_failure,
             process_new=None if args.dry_run else process_new,

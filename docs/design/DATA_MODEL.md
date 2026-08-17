@@ -103,6 +103,8 @@ Phase 7.1 preserves `full_meeting_minutes` in the analysis schema but projects i
 
 Phase 8 Inbox state is operational, not part of the Canonical Meeting Record. Source identity consists of absolute path, byte size, and SHA-256. Run manifests contain only identity, meeting ID, initial/final state, timestamps, and sanitized failures. They contain no Transcript or analysis content.
 
+For multi-file meetings, `MeetingSource` contains an ordered list of sequence, relative path, size, SHA-256, and optional prepared duration. `composite_sha256` hashes the deterministic ordered identity manifest. Multi-file `metadata.json` adds `source_type`, `sources`, `composite_sha256`, and total duration; historical single-file metadata retains its existing shape and remains readable.
+
 ### Topic
 
 Each Topic contains:

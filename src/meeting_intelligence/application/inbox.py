@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import StrEnum
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -16,6 +15,7 @@ import uuid
 
 from meeting_intelligence.domain.errors import ConfigurationError, OutputWriteError
 from meeting_intelligence.media.tools import sha256_file
+from meeting_intelligence.media.models import MeetingSource, MeetingSourcePart
 
 
 class InboxState(StrEnum):
@@ -37,7 +37,7 @@ class SourceIdentity:
 
 @dataclass(frozen=True, slots=True)
 class InboxItem:
-    source: SourceIdentity
+    source: MeetingSource | SourceIdentity
     meeting_id: str
     state: InboxState
     output_directory: Path
@@ -62,6 +62,12 @@ def discover_mp4(inbox_root: Path) -> list[Path]:
     )
 
 
+def discover_meeting_directories(inbox_root: Path) -> list[Path]:
+    root = inbox_root.expanduser().resolve()
+    paths = discover_mp4(root)
+    return sorted({path.parent for path in paths}, key=lambda path: ("." if path == root else path.relative_to(root).as_posix()).casefold())
+
+
 def source_is_stable(path: Path, stable_age_seconds: float, *, now: float | None = None) -> tuple[bool, str]:
     try:
         stat = path.stat()
@@ -81,33 +87,105 @@ def identify_source(path: Path, inbox_root: Path) -> SourceIdentity:
     return SourceIdentity(resolved, resolved.relative_to(inbox_root.resolve()).as_posix(), stat.st_size, sha256_file(resolved))
 
 
+def identify_meeting_source(directory: Path, inbox_root: Path) -> MeetingSource:
+    root = inbox_root.expanduser().resolve()
+    resolved = directory.resolve()
+    paths = sorted((path for path in resolved.iterdir() if path.is_file() and path.suffix.lower() == ".mp4"), key=lambda path: path.name.casefold())
+    parts = [MeetingSourcePart(sequence=index, path=path.resolve(), relative_path=path.resolve().relative_to(root).as_posix(), size_bytes=path.stat().st_size, sha256=sha256_file(path)) for index, path in enumerate(paths, start=1)]
+    relative_directory = "." if resolved == root else resolved.relative_to(root).as_posix()
+    return MeetingSource.from_parts(resolved, relative_directory, parts)
+
+
+def meeting_source_is_stable(directory: Path, stable_age_seconds: float, folder_stable_age_seconds: float, *, now: float | None = None) -> tuple[bool, str]:
+    current = datetime.now(timezone.utc).timestamp() if now is None else now
+    try:
+        paths = [path for path in directory.iterdir() if path.is_file() and path.suffix.lower() == ".mp4"]
+        if not paths:
+            return False, "meeting folder has no MP4 files"
+        if current - directory.stat().st_mtime < folder_stable_age_seconds:
+            return False, "meeting folder is newer than the folder stability window"
+    except OSError:
+        return False, "meeting folder is missing or unreadable"
+    for path in paths:
+        stable, reason = source_is_stable(path, stable_age_seconds, now=current)
+        if not stable:
+            return False, f"{path.name}: {reason}"
+    return True, ""
+
+
 def infer_meeting_id(relative_path: str, source_hash: str) -> str:
     stem = str(Path(relative_path).with_suffix("")).replace("\\", "-").replace("/", "-")
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", stem).strip("-.") or "meeting"
     return slug[:96] if len(slug) <= 96 else f"{slug[:83]}-{source_hash[:12]}"
 
 
-def _metadata_identity(directory: Path) -> tuple[str, str] | None:
+def infer_source_meeting_id(source: MeetingSource | SourceIdentity) -> str:
+    if isinstance(source, SourceIdentity):
+        return infer_meeting_id(source.relative_path, source.sha256)
+    basis = source.relative_directory
+    if basis == "." and len(source.parts) == 1:
+        basis = source.parts[0].relative_path
+    elif basis == ".":
+        basis = "inbox"
+    slug = str(Path(basis).with_suffix("")) if len(source.parts) == 1 and basis.endswith(".mp4") else basis
+    return infer_meeting_id(slug, source.composite_sha256)
+
+
+def _metadata_identity(directory: Path) -> dict | None:
     try:
         value = json.loads((directory / "metadata.json").read_text(encoding="utf-8"))
-        return str(value.get("media", {}).get("source_path", "")), str(value.get("media", {}).get("source_sha256", ""))
+        return value.get("media", {})
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None
 
 
-def matching_outputs(source: SourceIdentity, output_root: Path) -> list[Path]:
+def _source_directory(source: MeetingSource | SourceIdentity) -> Path:
+    return source.directory if isinstance(source, MeetingSource) else source.path.parent
+
+
+def _source_hash(source: MeetingSource | SourceIdentity) -> str:
+    return source.composite_sha256 if isinstance(source, MeetingSource) else source.sha256
+
+
+def _metadata_matches(media: dict, source: MeetingSource | SourceIdentity) -> bool:
+    if isinstance(source, MeetingSource) and "composite_sha256" in media:
+        return media.get("composite_sha256") == source.composite_sha256 and Path(str(media.get("source_path", ""))).resolve() == source.directory
+    if isinstance(source, MeetingSource) and len(source.parts) == 1:
+        part = source.parts[0]
+        return media.get("source_sha256") == part.sha256 and Path(str(media.get("source_path", ""))).resolve() == part.path
+    if isinstance(source, SourceIdentity):
+        return media.get("source_sha256") == source.sha256 and Path(str(media.get("source_path", ""))).resolve() == source.path
+    return False
+
+
+def matching_outputs(source: MeetingSource | SourceIdentity, output_root: Path) -> list[Path]:
     root = output_root.expanduser().resolve()
     if not root.is_dir():
         return []
     matches = []
     for metadata in root.glob("*/metadata.json"):
         identity = _metadata_identity(metadata.parent)
-        if identity and identity[1] == source.sha256 and Path(identity[0]).resolve() == source.path:
+        if identity and _metadata_matches(identity, source):
             matches.append(metadata.parent)
     return matches
 
 
-def find_output(source: SourceIdentity, output_root: Path) -> Path | None:
+def changed_source_outputs(source: MeetingSource, output_root: Path) -> list[Path]:
+    root = output_root.expanduser().resolve()
+    if not root.is_dir():
+        return []
+    changed = []
+    for metadata in root.glob("*/metadata.json"):
+        media = _metadata_identity(metadata.parent)
+        if not media or _metadata_matches(media, source):
+            continue
+        stored_path = Path(str(media.get("source_path", ""))).resolve()
+        if stored_path == source.directory or stored_path.parent == source.directory:
+            changed.append(metadata.parent)
+    return changed
+
+
+def find_output(source: MeetingSource | SourceIdentity, output_root: Path) -> Path | None:
     matches = matching_outputs(source, output_root)
     if len(matches) == 1:
         return matches[0]
@@ -116,7 +194,7 @@ def find_output(source: SourceIdentity, output_root: Path) -> Path | None:
 
 
 def classify_item(
-    source: SourceIdentity,
+    source: MeetingSource | SourceIdentity,
     output_root: Path,
     *,
     stable: bool = True,
@@ -124,7 +202,7 @@ def classify_item(
     sheet_exists: bool | None = None,
     failed_marker: bool = False,
 ) -> InboxItem:
-    inferred = infer_meeting_id(source.relative_path, source.sha256)
+    inferred = infer_source_meeting_id(source)
     if not stable:
         return InboxItem(source, inferred, InboxState.BLOCKED, output_root / inferred, stability_reason)
     matches = matching_outputs(source, output_root)
@@ -132,9 +210,11 @@ def classify_item(
     if directory is None:
         if matches:
             return InboxItem(source, inferred, InboxState.BLOCKED, output_root / inferred, "multiple outputs match this source without one unique completed result")
+        if isinstance(source, MeetingSource) and changed_source_outputs(source, output_root):
+            return InboxItem(source, inferred, InboxState.BLOCKED, output_root / inferred, "meeting folder source parts changed after an earlier output")
         candidate = output_root / inferred
         if candidate.exists():
-            inferred = f"{inferred[:83]}-{source.sha256[:12]}"
+            inferred = f"{inferred[:83]}-{_source_hash(source)[:12]}"
             candidate = output_root / inferred
             if candidate.exists():
                 return InboxItem(source, inferred, InboxState.BLOCKED, candidate, "meeting ID and hash suffix collide with a different or unverifiable source")
@@ -193,36 +273,37 @@ def run_inbox(
     work_root: Path,
     *,
     stable_age_seconds: float,
+    folder_stable_age_seconds: float | None = None,
     dry_run: bool,
     continue_on_failure: bool,
-    process_new: Callable[[Path, str], None] | None = None,
+    process_new: Callable[[MeetingSource, str], None] | None = None,
     resume: Callable[[Path, str], None] | None = None,
     sheet_contains: Callable[[str], bool] | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> InboxSummary:
     notify = progress or (lambda _: None)
-    paths = discover_mp4(inbox_root)
-    notify(f"Inbox scan: {len(paths)} MP4 files")
+    directories = discover_meeting_directories(inbox_root)
+    notify(f"Inbox scan: {len(directories)} meeting sources")
     summary = {"processed": 0, "resumed": 0, "skipped": 0, "failed": 0}
     records = []
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
 
     def execute() -> None:
-        for index, path in enumerate(paths, start=1):
-            stable, reason = source_is_stable(path, stable_age_seconds)
-            if not stable and path.exists() and path.stat().st_size:
-                relative = path.resolve().relative_to(inbox_root.resolve()).as_posix()
-                source = SourceIdentity(path.resolve(), relative, path.stat().st_size, "not-computed")
-            elif not stable:
-                relative = path.name
-                source = SourceIdentity(path, relative, 0, "not-computed")
+        for index, directory in enumerate(directories, start=1):
+            stable, reason = meeting_source_is_stable(directory, stable_age_seconds, folder_stable_age_seconds if folder_stable_age_seconds is not None else stable_age_seconds)
+            if stable:
+                source = identify_meeting_source(directory, inbox_root)
             else:
-                source = identify_source(path, inbox_root)
+                root = inbox_root.resolve()
+                paths = sorted((path for path in directory.iterdir() if path.is_file() and path.suffix.lower() == ".mp4"), key=lambda path: path.name.casefold())
+                parts = [MeetingSourcePart(sequence=i, path=path.resolve(), relative_path=path.resolve().relative_to(root).as_posix(), size_bytes=max(path.stat().st_size, 1), sha256="0" * 64) for i, path in enumerate(paths, start=1)]
+                relative_directory = "." if directory.resolve() == root else directory.resolve().relative_to(root).as_posix()
+                source = MeetingSource.from_parts(directory.resolve(), relative_directory, parts)
             local_item = classify_item(source, output_root, stable=stable, stability_reason=reason)
             item = local_item
             if not dry_run and local_item.state is InboxState.ANALYSIS_COMPLETE and sheet_contains is not None:
                 item = classify_item(source, output_root, sheet_exists=sheet_contains(local_item.meeting_id))
-            notify(f"[{index}/{len(paths)}] {item.state.value} {item.source.relative_path} -> {item.meeting_id}")
+            notify(f"[{index}/{len(directories)}] {item.state.value} {source.relative_directory} -> {item.meeting_id} parts={len(source.parts)}")
             initial = item.state
             final = initial
             error = ""
@@ -232,7 +313,8 @@ def run_inbox(
                 elif initial is InboxState.NEW:
                     if process_new is None:
                         raise ConfigurationError("new-meeting processor is not configured")
-                    process_new(item.source.path, item.meeting_id)
+                    notify(f"Meeting source: {len(source.parts)} MP4 parts")
+                    process_new(source, item.meeting_id)
                     summary["processed"] += 1
                     final = InboxState.COMPLETE
                 elif initial in {InboxState.TRANSCRIPT_COMPLETE, InboxState.FAILED_RESUMABLE}:
@@ -252,9 +334,9 @@ def run_inbox(
                 final = InboxState.FAILED_RESUMABLE if (item.output_directory / "transcript.json").is_file() else InboxState.BLOCKED
                 error = f"{type(exc).__name__}: {str(exc)[:500]}"
                 if not continue_on_failure:
-                    records.append({"source_path": str(source.path), "meeting_id": item.meeting_id, "initial_state": initial.value, "final_state": final.value, "error": error})
+                    records.append({"source_paths": [str(part.path) for part in source.parts], "meeting_id": item.meeting_id, "initial_state": initial.value, "final_state": final.value, "error": error})
                     break
-            records.append({"source_path": str(source.path), "meeting_id": item.meeting_id, "initial_state": initial.value, "final_state": final.value, "error": error})
+            records.append({"source_paths": [str(part.path) for part in source.parts], "meeting_id": item.meeting_id, "initial_state": initial.value, "final_state": final.value, "error": error})
 
     if dry_run:
         execute()

@@ -1,5 +1,7 @@
 """Minimal media models for reproducible audio preparation."""
 
+import hashlib
+import json
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -13,6 +15,34 @@ class MediaSource(MediaModel):
     file_name: str
     size_bytes: int = Field(gt=0)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class MeetingSourcePart(MediaModel):
+    sequence: int = Field(ge=1)
+    path: Path
+    relative_path: str = Field(min_length=1)
+    size_bytes: int = Field(gt=0)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    duration_seconds: float | None = Field(default=None, ge=0)
+
+
+class MeetingSource(MediaModel):
+    directory: Path
+    relative_directory: str
+    parts: list[MeetingSourcePart] = Field(min_length=1)
+    composite_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @property
+    def source_type(self) -> str:
+        return "single" if len(self.parts) == 1 else "multi"
+
+    @classmethod
+    def from_parts(cls, directory: Path, relative_directory: str, parts: list[MeetingSourcePart]) -> "MeetingSource":
+        ordered = sorted(parts, key=lambda part: part.relative_path.casefold())
+        normalized = [part.model_copy(update={"sequence": index}) for index, part in enumerate(ordered, start=1)]
+        manifest = [{"relative_path": part.relative_path, "size_bytes": part.size_bytes, "sha256": part.sha256} for part in normalized]
+        digest = hashlib.sha256(json.dumps(manifest, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest()
+        return cls(directory=directory, relative_directory=relative_directory, parts=normalized, composite_sha256=digest)
 
 
 class AudioStreamMetadata(MediaModel):

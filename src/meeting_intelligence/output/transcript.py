@@ -19,7 +19,7 @@ from meeting_intelligence.domain.errors import (
     OutputWriteError,
 )
 from meeting_intelligence.domain.transcript import TranscriptRecord
-from meeting_intelligence.media.models import MediaSource
+from meeting_intelligence.media.models import MediaSource, MeetingSource
 from meeting_intelligence.media.tools import sha256_file
 
 
@@ -133,7 +133,7 @@ def _write_new(path: Path, content: bytes) -> None:
 
 def persist_transcript_record(
     transcript: TranscriptRecord,
-    source_media: MediaSource,
+    source_media: MediaSource | MeetingSource,
     source_duration_seconds: float,
     processing: ProcessingContext,
     output_root: Path,
@@ -146,7 +146,10 @@ def persist_transcript_record(
         raise OutputValidationError("processing language does not match transcript language")
     if source_duration_seconds < 0:
         raise OutputValidationError("source duration must be non-negative")
-    if source_media.sha256 != sha256_file(source_media.path):
+    if isinstance(source_media, MeetingSource):
+        if any(part.sha256 != sha256_file(part.path) for part in source_media.parts):
+            raise OutputValidationError("a source part changed before output persistence")
+    elif source_media.sha256 != sha256_file(source_media.path):
         raise OutputValidationError("source media changed before output persistence")
 
     output_root = output_root.expanduser().resolve()
@@ -166,9 +169,38 @@ def persist_transcript_record(
         metadata_json = staging_directory / "metadata.json"
         _write_new(transcript_json, _json_bytes(validated.model_dump(mode="json")))
         _write_new(transcript_markdown, render_transcript_markdown(validated).encode("utf-8"))
+        if isinstance(source_media, MeetingSource):
+            source_reference = str(source_media.directory.resolve())
+            media_metadata = {
+                "source_type": source_media.source_type,
+                "source_path": source_reference,
+                "composite_sha256": source_media.composite_sha256,
+                "source_duration_seconds": source_duration_seconds,
+                "total_duration_seconds": source_duration_seconds,
+                "sources": [
+                    {
+                        "sequence": part.sequence,
+                        "path": str(part.path.resolve()),
+                        "relative_path": part.relative_path,
+                        "size_bytes": part.size_bytes,
+                        "sha256": part.sha256,
+                        "duration_seconds": part.duration_seconds,
+                    }
+                    for part in source_media.parts
+                ],
+            }
+        else:
+            source_reference = str(source_media.path.resolve())
+            media_metadata = {
+                "source_sha256": source_media.sha256,
+                "source_file_name": source_media.file_name,
+                "source_path": source_reference,
+                "source_size_bytes": source_media.size_bytes,
+                "source_duration_seconds": source_duration_seconds,
+            }
         metadata = {
             "meeting_id": meeting_id,
-            "source": str(source_media.path.resolve()),
+            "source": source_reference,
             "status": "completed",
             "processed_at": processed_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
             "application_version": processing.application_version,
@@ -180,13 +212,7 @@ def persist_transcript_record(
                 "response_format": processing.transcription_response_format,
                 "language": processing.transcription_language,
             },
-            "media": {
-                "source_sha256": source_media.sha256,
-                "source_file_name": source_media.file_name,
-                "source_path": str(source_media.path.resolve()),
-                "source_size_bytes": source_media.size_bytes,
-                "source_duration_seconds": source_duration_seconds,
-            },
+            "media": media_metadata,
             "artifacts": {
                 "transcript_json": {"path": "transcript.json", "sha256": sha256_file(transcript_json)},
                 "transcript_markdown": {"path": "transcript.md", "sha256": sha256_file(transcript_markdown)},

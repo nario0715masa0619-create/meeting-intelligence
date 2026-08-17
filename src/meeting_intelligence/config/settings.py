@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     work_dir: Path = Path(".work")
     inbox_root: Path | None = None
     inbox_stable_age_seconds: float = Field(default=120.0, ge=0)
+    inbox_folder_stable_age_seconds: float = Field(default=120.0, ge=0)
     inbox_continue_on_meeting_failure: bool = True
     transcription_provider: str = "openai"
     analysis_provider: str = "openai"
